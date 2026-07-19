@@ -157,7 +157,7 @@ verify_platform() {
 verify_binaries() {
     local missing=0
     local name
-    for name in bash awk sed grep cut sort uniq date stat find timeout flock install cp mv mkdir chmod chown getent uname id hostname mktemp; do
+    for name in bash awk sed grep cut sort uniq date stat find timeout flock install cp mv mkdir chmod chown chgrp getent uname id hostname mktemp; do
         if ! command -v "${name}" >/dev/null 2>&1; then
             printf 'Missing required binary: %s\n' "${name}" >&2
             missing=1
@@ -323,6 +323,23 @@ create_directories() {
     create_secure_dir "${STATE_DIR}" 2770 "${RUNTIME_WRITE_GROUP}"
     create_secure_dir "${STATE_DIR}/reports" 2770 "${RUNTIME_WRITE_GROUP}"
     create_secure_dir "${LOCK_DIR}" 2770 "${RUNTIME_WRITE_GROUP}"
+}
+
+normalize_runtime_write_tree() {
+    local target
+
+    [[ -d "${STATE_DIR}" ]] || return 0
+    while IFS= read -r -d '' target; do
+        assert_target "${target}"
+        run_cmd chown "root:${RUNTIME_WRITE_GROUP}" "${target}" || return 1
+        run_cmd chmod 2770 "${target}" || return 1
+    done < <(find "${STATE_DIR}" -mindepth 1 -type d -print0)
+
+    while IFS= read -r -d '' target; do
+        assert_target "${target}"
+        run_cmd chown "root:${RUNTIME_WRITE_GROUP}" "${target}" || return 1
+        run_cmd chmod 0660 "${target}" || return 1
+    done < <(find "${STATE_DIR}" -type f -print0)
 }
 
 install_binary() {
@@ -540,6 +557,7 @@ main() {
     validate_existing_destinations
     show_plan
     create_directories
+    normalize_runtime_write_tree
     install_binary
     install_runtime
     install_config_template

@@ -7,6 +7,7 @@ readonly MST_VERSION="1.0.0"
 readonly MST_SUPPORTED_CONFIG_SCHEMA_VERSION="1"
 readonly MST_DEFAULT_TIMEOUT_SECONDS="10"
 readonly MST_LOCK_SCHEMA_VERSION="1"
+readonly MST_RUNTIME_WRITE_GROUP="sudo"
 
 # Initialize the process environment before config is loaded.
 mst_runtime_init() {
@@ -83,6 +84,15 @@ mst_lock_metadata_path() {
     printf '%s/%s.lock.json' "${MST_LOCK_DIR}" "${lock_name}"
 }
 
+# Normalize one runtime-created file so sudo-installed admin users can reuse it.
+mst_runtime_normalize_write_file() {
+    local path="${1:?path required}"
+    local mode="${2:?mode required}"
+
+    chmod "${mode}" "${path}" 2>/dev/null || return 1
+    chgrp "${MST_RUNTIME_WRITE_GROUP}" "${path}" 2>/dev/null || true
+}
+
 # Create the lock directory if it is missing.
 mst_lock_prepare_directory() {
     MST_LOCK_DIR="$(mst_fs_validate_runtime_directory "${MST_LOCK_DIR}")" || {
@@ -114,7 +124,7 @@ mst_lock_acquire_nonblocking() {
         return 1
     fi
     if flock -n "${MST_LOCK_FD}"; then
-        chmod 0660 "${lock_path}" 2>/dev/null || true
+        mst_runtime_normalize_write_file "${lock_path}" 0660 || true
         export MST_ACTIVE_LOCK_NAME="${lock_name}"
         export MST_ACTIVE_LOCK_PATH="${lock_path}"
         export MST_ACTIVE_LOCK_FD="${MST_LOCK_FD}"
@@ -156,7 +166,7 @@ mst_lock_write_metadata() {
   "toolkit_version": "$(mst_lock_sanitize_metadata_value "${MST_VERSION}")"
 }
 EOF
-    chmod 0660 "${tmp_file}" 2>/dev/null || true
+    mst_runtime_normalize_write_file "${tmp_file}" 0660 || true
     mv -f -- "${tmp_file}" "${metadata_path}"
     trap - RETURN
 }

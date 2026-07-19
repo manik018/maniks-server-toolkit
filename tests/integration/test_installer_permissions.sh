@@ -156,6 +156,7 @@ path_mode() {
 
 run_install_steps() {
     create_directories
+    normalize_runtime_write_tree
     install_binary
     install_runtime
     install_config_template
@@ -193,6 +194,15 @@ assert_no_writable_paths() {
 
 make_source_tree
 configure_installer_paths
+mkdir -p "${STATE_DIR}/reports" "${LOCK_DIR}"
+printf 'old lock\n' > "${LOCK_DIR}/health.lock"
+printf 'old metadata\n' > "${LOCK_DIR}/health.lock.json"
+printf 'old report\n' > "${STATE_DIR}/reports/health.mrrf1.json"
+printf 'old alert\n' > "${STATE_DIR}/alerts.state"
+record_mode "${LOCK_DIR}/health.lock" 0640
+record_mode "${LOCK_DIR}/health.lock.json" 0640
+record_mode "${STATE_DIR}/reports/health.mrrf1.json" 0640
+record_mode "${STATE_DIR}/alerts.state" 0640
 
 umask 000
 run_install_steps
@@ -208,6 +218,10 @@ assert_mode "${LOG_DIR}" 750
 assert_mode "${STATE_DIR}" 2770
 assert_mode "${STATE_DIR}/reports" 2770
 assert_mode "${LOCK_DIR}" 2770
+assert_mode "${LOCK_DIR}/health.lock" 660
+assert_mode "${LOCK_DIR}/health.lock.json" 660
+assert_mode "${STATE_DIR}/reports/health.mrrf1.json" 660
+assert_mode "${STATE_DIR}/alerts.state" 660
 assert_no_writable_paths "${LIB_DIR}"
 
 umask 077

@@ -222,7 +222,11 @@ mst_fs_atomic_write() {
     tmp_file="$(mktemp "${target}.tmp.XXXXXX")"
     trap 'rm -f -- "${tmp_file}"' RETURN
     printf '%s\n' "${content}" > "${tmp_file}"
-    chmod "${mode}" "${tmp_file}"
+    if declare -F mst_runtime_normalize_write_file >/dev/null 2>&1; then
+        mst_runtime_normalize_write_file "${tmp_file}" "${mode}"
+    else
+        chmod "${mode}" "${tmp_file}"
+    fi
     mv -f -- "${tmp_file}" "${target}"
     trap - RETURN
 }

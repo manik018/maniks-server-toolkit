@@ -26,6 +26,7 @@ uniq|required|text
 date|required|time
 stat|required|filesystem
 find|required|filesystem
+chgrp|required|filesystem
 timeout|required|process
 flock|required|locking
 df|optional|runtime
