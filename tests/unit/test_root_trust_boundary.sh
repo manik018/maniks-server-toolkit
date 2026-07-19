@@ -14,7 +14,7 @@ printf 'poisoned\n' > "${MARKER_FILE}"
 EOF
 
 output="$(MST_ROOT="${EVIL_DIR}" "${ROOT_DIR}/mst" version)"
-[[ "${output}" == *"1.0.2"* ]] || exit 1
+[[ "${output}" == *"1.0.4"* ]] || exit 1
 [[ ! -e "${MARKER_FILE}" ]] || exit 1
 
 printf 'test_root_trust_boundary.sh passed.\n'
