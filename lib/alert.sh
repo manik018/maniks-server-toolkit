@@ -327,7 +327,7 @@ mst_alert_save_state() {
         return 2
     }
     content="$(printf '%s\n' "${MST_ALERT_STATE_ROWS[@]:-}")"
-    mst_fs_atomic_write "${state_file}" 0640 "${content}" || {
+    mst_fs_atomic_write "${state_file}" 0660 "${content}" || {
         export MST_ALERT_STATE_SAVE_ERROR="write_failed"
         return 1
     }

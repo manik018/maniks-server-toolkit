@@ -129,7 +129,18 @@ path_owner_uid() {
 }
 
 path_group_gid() {
-    printf '0'
+    case "${1:?path required}" in
+        "${CONFIG_DIR}"|"${CONFIG_DIR}/config.conf"|"${STATE_DIR}"|"${STATE_DIR}/reports"|"${LOCK_DIR}")
+            printf '27'
+            ;;
+        *)
+            printf '0'
+            ;;
+    esac
+}
+
+runtime_write_group_gid() {
+    printf '27'
 }
 
 path_mode() {
@@ -192,17 +203,18 @@ assert_mode "${LIB_DIR}/commands/health.sh" 644
 assert_mode "${LIB_DIR}/mst" 755
 assert_mode "${BIN_DIR}/mst" 755
 assert_mode "${CONFIG_DIR}" 750
-assert_mode "${CONFIG_DIR}/config.conf" 600
+assert_mode "${CONFIG_DIR}/config.conf" 640
 assert_mode "${LOG_DIR}" 750
-assert_mode "${STATE_DIR}" 750
-assert_mode "${LOCK_DIR}" 750
+assert_mode "${STATE_DIR}" 2770
+assert_mode "${STATE_DIR}/reports" 2770
+assert_mode "${LOCK_DIR}" 2770
 assert_no_writable_paths "${LIB_DIR}"
 
 umask 077
 run_install_steps
 assert_mode "${LIB_DIR}/lib/runtime.sh" 644
 assert_mode "${LIB_DIR}/mst" 755
-assert_mode "${CONFIG_DIR}/config.conf" 600
+assert_mode "${CONFIG_DIR}/config.conf" 640
 assert_no_writable_paths "${LIB_DIR}"
 
 chmod 0666 "${LIB_DIR}/lib/runtime.sh"

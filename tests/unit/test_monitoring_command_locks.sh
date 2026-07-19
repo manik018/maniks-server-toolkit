@@ -54,8 +54,10 @@ mst_lock_acquire_nonblocking() {
     LOCK_ACQUIRE_CALLS=$((LOCK_ACQUIRE_CALLS + 1))
     LAST_LOCK_NAME="${1:?lock name required}"
     if [[ "${LOCK_FAIL}" == "true" ]]; then
+        export MST_LOCK_ERROR="lock already held"
         return 1
     fi
+    unset MST_LOCK_ERROR
     return 0
 }
 

@@ -31,7 +31,7 @@ mst_state_save_report() {
     report_dir="$(mst_fs_validate_runtime_directory "${report_dir}")" || return 1
     mst_fs_ensure_directory "${report_dir}" || return 1
     report_file="$(mst_fs_validate_runtime_file_path "${report_file}")" || return 1
-    mst_fs_atomic_write "${report_file}" 0640 "${report_json}"
+    mst_fs_atomic_write "${report_file}" 0660 "${report_json}"
 }
 
 mst_state_load_report() {

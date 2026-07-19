@@ -25,6 +25,7 @@ CONFIG_DIR="/etc/mst"
 LOG_DIR="/var/log/mst"
 STATE_DIR="/var/lib/mst"
 LOCK_DIR="/var/lib/mst/locks"
+RUNTIME_WRITE_GROUP="sudo"
 LOGROTATE_FILE="/etc/logrotate.d/mst"
 CRON_TEMPLATE_FILE="/etc/mst/mst.cron.example"
 
@@ -83,6 +84,16 @@ path_owner_uid() {
 
 path_group_gid() {
     stat -c '%g' -- "${1:?path required}"
+}
+
+runtime_write_group_gid() {
+    local gid
+    gid="$(getent group "${RUNTIME_WRITE_GROUP}" 2>/dev/null | awk -F: '{ print $3 }')" || true
+    [[ -n "${gid}" ]] || {
+        printf 'Required runtime write group is missing: %s\n' "${RUNTIME_WRITE_GROUP}" >&2
+        exit 8
+    }
+    printf '%s' "${gid}"
 }
 
 parse_args() {
@@ -146,7 +157,7 @@ verify_platform() {
 verify_binaries() {
     local missing=0
     local name
-    for name in bash awk sed grep cut sort uniq date stat find timeout flock install cp mv mkdir chmod uname id hostname mktemp; do
+    for name in bash awk sed grep cut sort uniq date stat find timeout flock install cp mv mkdir chmod chown getent uname id hostname mktemp; do
         if ! command -v "${name}" >/dev/null 2>&1; then
             printf 'Missing required binary: %s\n' "${name}" >&2
             missing=1
@@ -176,22 +187,36 @@ assert_target() {
 
 validate_existing_directory_destination() {
     local target="${1:?target required}"
+    local actual_group expected_group
     assert_target "${target}"
     [[ -e "${target}" ]] || [[ -L "${target}" ]] || return 0
     [[ ! -L "${target}" ]] || fail_unsafe_existing_destination "${target}" "symbolic link"
     [[ -d "${target}" ]] || fail_unsafe_existing_destination "${target}" "expected directory"
     [[ "$(path_owner_uid "${target}")" == "0" ]] || fail_unsafe_existing_destination "${target}" "not owned by root"
-    [[ "$(path_group_gid "${target}")" == "0" ]] || fail_unsafe_existing_destination "${target}" "group is not root"
+    actual_group="$(path_group_gid "${target}")"
+    if [[ "${target}" == "${CONFIG_DIR}" ]] || [[ "${target}" == "${STATE_DIR}" ]] || [[ "${target}" == "${STATE_DIR}/reports" ]] || [[ "${target}" == "${LOCK_DIR}" ]]; then
+        expected_group="$(runtime_write_group_gid)"
+        [[ "${actual_group}" == "0" ]] || [[ "${actual_group}" == "${expected_group}" ]] || fail_unsafe_existing_destination "${target}" "unexpected group"
+    else
+        [[ "${actual_group}" == "0" ]] || fail_unsafe_existing_destination "${target}" "group is not root"
+    fi
 }
 
 validate_existing_file_destination() {
     local target="${1:?target required}"
+    local actual_group expected_group
     assert_target "${target}"
     [[ -e "${target}" ]] || [[ -L "${target}" ]] || return 0
     [[ ! -L "${target}" ]] || fail_unsafe_existing_destination "${target}" "symbolic link"
     [[ -f "${target}" ]] || fail_unsafe_existing_destination "${target}" "expected regular file"
     [[ "$(path_owner_uid "${target}")" == "0" ]] || fail_unsafe_existing_destination "${target}" "not owned by root"
-    [[ "$(path_group_gid "${target}")" == "0" ]] || fail_unsafe_existing_destination "${target}" "group is not root"
+    actual_group="$(path_group_gid "${target}")"
+    if [[ "${target}" == "${CONFIG_DIR}/config.conf" ]]; then
+        expected_group="$(runtime_write_group_gid)"
+        [[ "${actual_group}" == "0" ]] || [[ "${actual_group}" == "${expected_group}" ]] || fail_unsafe_existing_destination "${target}" "unexpected group"
+    else
+        [[ "${actual_group}" == "0" ]] || fail_unsafe_existing_destination "${target}" "group is not root"
+    fi
 }
 
 validate_existing_destinations() {
@@ -202,6 +227,7 @@ validate_existing_destinations() {
     validate_existing_file_destination "${CONFIG_DIR}/config.conf"
     validate_existing_directory_destination "${LOG_DIR}"
     validate_existing_directory_destination "${STATE_DIR}"
+    validate_existing_directory_destination "${STATE_DIR}/reports"
     validate_existing_directory_destination "${LOCK_DIR}"
     validate_existing_file_destination "${LOGROTATE_FILE}"
     if [[ "${INSTALL_CRON_TEMPLATE}" -eq 1 ]]; then
@@ -253,6 +279,7 @@ validate_source_package() {
 create_secure_dir() {
     local target="${1:?target required}"
     local mode="${2:?mode required}"
+    local owner_group="${3:-root}"
 
     assert_target "${target}"
     [[ ! -L "${target}" ]] || {
@@ -260,7 +287,7 @@ create_secure_dir() {
         exit 8
     }
     run_cmd install -d -m "${mode}" "${target}" || return 1
-    run_cmd chown root:root "${target}" || return 1
+    run_cmd chown "root:${owner_group}" "${target}" || return 1
     run_cmd chmod "${mode}" "${target}" || return 1
 }
 
@@ -268,6 +295,7 @@ install_secure_file() {
     local source="${1:?source required}"
     local target="${2:?target required}"
     local mode="${3:?mode required}"
+    local owner_group="${4:-root}"
 
     assert_target "${target}"
     [[ -f "${source}" ]] || {
@@ -279,7 +307,7 @@ install_secure_file() {
         exit 8
     }
     run_cmd install -m "${mode}" "${source}" "${target}" || return 1
-    run_cmd chown root:root "${target}" || return 1
+    run_cmd chown "root:${owner_group}" "${target}" || return 1
     run_cmd chmod "${mode}" "${target}" || return 1
 }
 
@@ -290,10 +318,11 @@ create_directories() {
         "${LIB_DIR}/config" "${LIB_DIR}/templates" "${LIB_DIR}/docs" "${LIB_DIR}/schemas"; do
         create_secure_dir "${path}" 0755
     done
-    create_secure_dir "${CONFIG_DIR}" 0750
+    create_secure_dir "${CONFIG_DIR}" 0750 "${RUNTIME_WRITE_GROUP}"
     create_secure_dir "${LOG_DIR}" 0750
-    create_secure_dir "${STATE_DIR}" 0750
-    create_secure_dir "${LOCK_DIR}" 0750
+    create_secure_dir "${STATE_DIR}" 2770 "${RUNTIME_WRITE_GROUP}"
+    create_secure_dir "${STATE_DIR}/reports" 2770 "${RUNTIME_WRITE_GROUP}"
+    create_secure_dir "${LOCK_DIR}" 2770 "${RUNTIME_WRITE_GROUP}"
 }
 
 install_binary() {
@@ -350,9 +379,11 @@ install_config_template() {
         else
             printf 'Existing configuration preserved: %s\n' "${target}"
         fi
+        run_cmd chown "root:${RUNTIME_WRITE_GROUP}" "${target}" || return 1
+        run_cmd chmod 0640 "${target}" || return 1
         return 0
     fi
-    install_secure_file "${PROJECT_ROOT}/config/config.conf.example" "${target}" 0600
+    install_secure_file "${PROJECT_ROOT}/config/config.conf.example" "${target}" 0640 "${RUNTIME_WRITE_GROUP}"
 }
 
 install_logrotate() {
@@ -368,14 +399,22 @@ install_optional_cron_template() {
 
 verify_owner_root() {
     local target="${1:?target required}"
+    local expected_group="${2:-root}"
     [[ "$(path_owner_uid "${target}")" == "0" ]] || {
         printf 'Installed path is not owned by root: %s\n' "${target}" >&2
         return 1
     }
-    [[ "$(path_group_gid "${target}")" == "0" ]] || {
-        printf 'Installed path group is not root: %s\n' "${target}" >&2
-        return 1
-    }
+    if [[ "${expected_group}" == "root" ]]; then
+        [[ "$(path_group_gid "${target}")" == "0" ]] || {
+            printf 'Installed path group is not root: %s\n' "${target}" >&2
+            return 1
+        }
+    else
+        [[ "$(path_group_gid "${target}")" == "$(runtime_write_group_gid)" ]] || {
+            printf 'Installed path group is not %s: %s\n' "${expected_group}" "${target}" >&2
+            return 1
+        }
+    fi
 }
 
 verify_mode_exact() {
@@ -405,17 +444,33 @@ verify_no_group_or_world_write() {
     fi
 }
 
+verify_no_world_write() {
+    local target="${1:?target required}"
+    local mode other_digit
+    mode="$(path_mode "${target}")" || return 1
+    other_digit="${mode: -1}"
+    if (( (10#${other_digit} & 2) != 0 )); then
+        printf 'Installed path is world writable: %s\n' "${target}" >&2
+        return 1
+    fi
+}
+
 verify_installed_path() {
     local target="${1:?target required}"
     local expected_mode="${2:?mode required}"
+    local expected_group="${3:-root}"
     [[ -e "${target}" ]] || return 0
     [[ ! -L "${target}" ]] || {
         printf 'Installed path unexpectedly symlinked: %s\n' "${target}" >&2
         return 1
     }
-    verify_owner_root "${target}"
+    verify_owner_root "${target}" "${expected_group}"
     verify_mode_exact "${target}" "${expected_mode}"
-    verify_no_group_or_world_write "${target}"
+    if [[ "${expected_group}" == "root" ]]; then
+        verify_no_group_or_world_write "${target}"
+    else
+        verify_no_world_write "${target}"
+    fi
 }
 
 verify_runtime_tree_permissions() {
@@ -445,11 +500,12 @@ verify_install_permissions() {
 
     verify_installed_path "${BIN_DIR}/mst" 0755 || failed=1
     verify_runtime_tree_permissions || failed=1
-    verify_installed_path "${CONFIG_DIR}" 0750 || failed=1
-    verify_installed_path "${CONFIG_DIR}/config.conf" 0600 || failed=1
+    verify_installed_path "${CONFIG_DIR}" 0750 "${RUNTIME_WRITE_GROUP}" || failed=1
+    verify_installed_path "${CONFIG_DIR}/config.conf" 0640 "${RUNTIME_WRITE_GROUP}" || failed=1
     verify_installed_path "${LOG_DIR}" 0750 || failed=1
-    verify_installed_path "${STATE_DIR}" 0750 || failed=1
-    verify_installed_path "${LOCK_DIR}" 0750 || failed=1
+    verify_installed_path "${STATE_DIR}" 2770 "${RUNTIME_WRITE_GROUP}" || failed=1
+    verify_installed_path "${STATE_DIR}/reports" 2770 "${RUNTIME_WRITE_GROUP}" || failed=1
+    verify_installed_path "${LOCK_DIR}" 2770 "${RUNTIME_WRITE_GROUP}" || failed=1
     verify_installed_path "${LOGROTATE_FILE}" 0644 || failed=1
     if [[ "${INSTALL_CRON_TEMPLATE}" -eq 1 ]]; then
         verify_installed_path "${CRON_TEMPLATE_FILE}" 0644 || failed=1

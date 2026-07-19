@@ -3,7 +3,7 @@
 
 readonly MST_APP_NAME="Manik's Server Toolkit"
 readonly MST_PROGRAM_NAME="mst"
-readonly MST_VERSION="0.1.0-foundation"
+readonly MST_VERSION="1.0.0"
 readonly MST_SUPPORTED_CONFIG_SCHEMA_VERSION="1"
 readonly MST_DEFAULT_TIMEOUT_SECONDS="10"
 readonly MST_LOCK_SCHEMA_VERSION="1"
@@ -85,9 +85,14 @@ mst_lock_metadata_path() {
 
 # Create the lock directory if it is missing.
 mst_lock_prepare_directory() {
-    MST_LOCK_DIR="$(mst_fs_validate_runtime_directory "${MST_LOCK_DIR}")" || return 1
-    mkdir -p -- "${MST_LOCK_DIR}"
-    chmod 0750 "${MST_LOCK_DIR}" 2>/dev/null || true
+    MST_LOCK_DIR="$(mst_fs_validate_runtime_directory "${MST_LOCK_DIR}")" || {
+        export MST_LOCK_ERROR="unable to validate lock directory"
+        return 1
+    }
+    mkdir -p -- "${MST_LOCK_DIR}" || {
+        export MST_LOCK_ERROR="unable to create lock directory"
+        return 1
+    }
 }
 
 # Acquire a non-blocking flock for a logical command name.
@@ -95,15 +100,21 @@ mst_lock_acquire_nonblocking() {
     local lock_name="${1:?lock name required}"
     local lock_path
 
+    unset MST_LOCK_ERROR
     mst_lock_prepare_directory || return 1
     lock_path="$(mst_lock_file_path "${lock_name}")"
     if [[ -L "${lock_path}" ]]; then
+        export MST_LOCK_ERROR="lock file is a symbolic link"
         return 1
     fi
 
-    exec {MST_LOCK_FD}>"${lock_path}"
+    if ! exec {MST_LOCK_FD}>"${lock_path}"; then
+        unset MST_LOCK_FD
+        export MST_LOCK_ERROR="unable to open lock file"
+        return 1
+    fi
     if flock -n "${MST_LOCK_FD}"; then
-        chmod 0640 "${lock_path}" 2>/dev/null || true
+        chmod 0660 "${lock_path}" 2>/dev/null || true
         export MST_ACTIVE_LOCK_NAME="${lock_name}"
         export MST_ACTIVE_LOCK_PATH="${lock_path}"
         export MST_ACTIVE_LOCK_FD="${MST_LOCK_FD}"
@@ -112,6 +123,7 @@ mst_lock_acquire_nonblocking() {
 
     exec {MST_LOCK_FD}>&-
     unset MST_LOCK_FD
+    export MST_LOCK_ERROR="lock already held"
     return 1
 }
 
@@ -144,7 +156,7 @@ mst_lock_write_metadata() {
   "toolkit_version": "$(mst_lock_sanitize_metadata_value "${MST_VERSION}")"
 }
 EOF
-    chmod 0640 "${tmp_file}" 2>/dev/null || true
+    chmod 0660 "${tmp_file}" 2>/dev/null || true
     mv -f -- "${tmp_file}" "${metadata_path}"
     trap - RETURN
 }
@@ -166,7 +178,11 @@ mst_command_run_with_lock() {
     local command_exit
 
     if ! mst_lock_acquire_nonblocking "${lock_name}"; then
-        mst_warning_block "Another ${lock_name} execution is already running."
+        if [[ "${MST_LOCK_ERROR:-}" == "lock already held" ]]; then
+            mst_warning_block "Another ${lock_name} execution is already running."
+        else
+            mst_error_block "Unable to initialize ${lock_name} lock: ${MST_LOCK_ERROR:-unknown lock error}."
+        fi
         return "${MST_EXIT_PARTIAL}"
     fi
 
