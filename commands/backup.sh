@@ -16,6 +16,7 @@ mst_command_backup_run() {
     fi
 
     mst_backup_collect_report
+    mst_state_save_report backup "${MST_BACKUP_REPORT_JSON:-}" || mst_log WARN backup BACKUP_STATE "Backup report state could not be persisted"
     mst_render_backup_report_text
     mst_log INFO backup BACKUP_REPORT "Backup module completed with exit code ${MST_BACKUP_REPORT_EXIT_CODE}"
     return "${MST_BACKUP_REPORT_EXIT_CODE}"

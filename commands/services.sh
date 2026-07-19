@@ -16,6 +16,7 @@ mst_command_services_run() {
     fi
 
     mst_services_collect_report
+    mst_state_save_report services "${MST_SERVICES_REPORT_JSON:-}" || mst_log WARN services SERVICES_STATE "Services report state could not be persisted"
     mst_render_services_report_text
     mst_log INFO services SERVICES_REPORT "Services module completed with exit code ${MST_SERVICES_REPORT_EXIT_CODE}"
     return "${MST_SERVICES_REPORT_EXIT_CODE}"

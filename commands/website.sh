@@ -16,6 +16,7 @@ mst_command_website_run() {
     fi
 
     mst_website_collect_report
+    mst_state_save_report website "${MST_WEBSITE_REPORT_JSON:-}" || mst_log WARN website WEBSITE_STATE "Website report state could not be persisted"
     mst_render_website_report_text
     mst_log INFO website WEBSITE_REPORT "Website module completed with exit code ${MST_WEBSITE_REPORT_EXIT_CODE}"
     return "${MST_WEBSITE_REPORT_EXIT_CODE}"
