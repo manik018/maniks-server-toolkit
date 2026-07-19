@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "document_type": "result",
+  "generated_at": "2026-07-17T12:10:00Z",
+  "records": [
+    {
+      "result_id": "res_security.auth_journal",
+      "module": "security",
+      "check": "failed_ssh_today",
+      "target": "ssh-journal",
+      "status": "unavailable",
+      "severity": "unknown",
+      "score": 10,
+      "summary": "Unavailable without elevated permission.",
+      "details": [],
+      "recommendations": [],
+      "metadata": {
+        "source": [
+          "journal"
+        ],
+        "provenance": "Auth journal requires elevated read access on this host.",
+        "privilege_requirement": "elevated_read",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [
+        {
+          "category": "permission",
+          "code": "JOURNAL_PERMISSION_DENIED",
+          "message": "Permission denied while reading the required journal source."
+        }
+      ],
+      "duration_ms": 41,
+      "observed_at": "2026-07-17T12:09:59Z"
+    }
+  ]
+}

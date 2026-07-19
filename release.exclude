@@ -1,0 +1,26 @@
+# MST release artifact exclusions.
+#
+# Use with tar from the project root:
+#   tar --exclude-from=release.exclude -czf mst-release.tar.gz .
+
+.git
+.git/**
+.test-tmp
+.test-tmp/**
+dist
+dist/**
+coverage
+coverage/**
+*.tmp
+*.log
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+__pycache__
+__pycache__/**
+*.pyc

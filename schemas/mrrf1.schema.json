@@ -1,0 +1,655 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mst.local/mrrf1/v1/mrrf1.schema.json",
+  "title": "MST Result Record Format v1",
+  "description": "Normalized output schema for individual MST checks and aggregate MST reports.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "document_type",
+    "generated_at",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "result",
+        "report"
+      ]
+    },
+    "toolkit": {
+      "type": "string",
+      "const": "mst"
+    },
+    "toolkit_version": {
+      "$ref": "#/$defs/safeTextShort"
+    },
+    "command": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "host": {
+      "$ref": "#/$defs/hostObject"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/resultRecord"
+      }
+    },
+    "aggregate": {
+      "$ref": "#/$defs/aggregateObject"
+    },
+    "exit_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "document_type": {
+            "const": "result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "records": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "document_type": {
+            "const": "report"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "aggregate"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "safeTextShort": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+    },
+    "safeTextMedium": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+    },
+    "safeTextLong": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+    },
+    "hostObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hostname"
+      ],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9.-]{1,253}$"
+        },
+        "fqdn": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9.-]{1,253}$"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "warn",
+        "critical",
+        "unknown",
+        "unavailable",
+        "skipped"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "warning",
+        "critical",
+        "unknown"
+      ]
+    },
+    "errorCategory": {
+      "type": "string",
+      "enum": [
+        "warning",
+        "critical",
+        "permission",
+        "timeout",
+        "network",
+        "configuration",
+        "dependency",
+        "internal",
+        "unknown"
+      ]
+    },
+    "detailObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "value_type",
+        "value",
+        "redacted"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "label": {
+          "$ref": "#/$defs/safeTextShort"
+        },
+        "value_type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 16,
+          "pattern": "^[A-Za-z0-9%_./-]*$"
+        },
+        "redacted": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "value_type": {
+                "const": "string"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[^\\x00-\\x1F\\x7F]*$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_type": {
+                "const": "integer"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": -999999999,
+                "maximum": 999999999
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_type": {
+                "const": "number"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_type": {
+                "const": "boolean"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_type": {
+                "const": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "recommendationObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "summary",
+        "priority",
+        "manual_action"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{2,63}$"
+        },
+        "summary": {
+          "$ref": "#/$defs/safeTextMedium"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "manual_action": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dependencyStateObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "required",
+        "available"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._+-]{1,64}$"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "metadataObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "provenance",
+        "privilege_requirement",
+        "contains_sensitive_data",
+        "redactions_present",
+        "optional_dependencies"
+      ],
+      "properties": {
+        "source": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "enum": [
+              "procfs",
+              "sysfs",
+              "filesystem",
+              "systemd",
+              "journal",
+              "network",
+              "config",
+              "derived",
+              "user_input",
+              "unknown"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "provenance": {
+          "$ref": "#/$defs/safeTextMedium"
+        },
+        "privilege_requirement": {
+          "type": "string",
+          "enum": [
+            "none",
+            "elevated_read",
+            "root_only_path",
+            "network_only"
+          ]
+        },
+        "contains_sensitive_data": {
+          "type": "boolean",
+          "const": false
+        },
+        "redactions_present": {
+          "type": "boolean"
+        },
+        "optional_dependencies": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/dependencyStateObject"
+          }
+        }
+      }
+    },
+    "errorObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/errorCategory"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "message": {
+          "$ref": "#/$defs/safeTextMedium"
+        }
+      }
+    },
+    "resultRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_id",
+        "module",
+        "check",
+        "target",
+        "status",
+        "severity",
+        "score",
+        "summary",
+        "details",
+        "recommendations",
+        "metadata",
+        "errors",
+        "duration_ms",
+        "observed_at"
+      ],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^res_[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "module": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$"
+        },
+        "check": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,63}$"
+        },
+        "target": {
+          "$ref": "#/$defs/safeTextShort"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "score": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/safeTextMedium"
+        },
+        "details": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/detailObject"
+          }
+        },
+        "recommendations": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/recommendationObject"
+          }
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadataObject"
+        },
+        "errors": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/errorObject"
+          }
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600000
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "unavailable",
+                  "skipped"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "ok"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "moduleAggregateObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "record_count",
+        "status",
+        "severity",
+        "score"
+      ],
+      "properties": {
+        "module": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$"
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "score": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "aggregateObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_count",
+        "overall_status",
+        "overall_severity",
+        "overall_score",
+        "risk_level",
+        "module_summaries"
+      ],
+      "properties": {
+        "record_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "overall_status": {
+          "$ref": "#/$defs/status"
+        },
+        "overall_severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "overall_score": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk_level": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "module_summaries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/moduleAggregateObject"
+          }
+        }
+      }
+    }
+  }
+}

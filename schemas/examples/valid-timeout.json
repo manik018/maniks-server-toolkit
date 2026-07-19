@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "document_type": "result",
+  "toolkit": "mst",
+  "toolkit_version": "0.1.0",
+  "command": "website",
+  "generated_at": "2026-07-17T12:15:00Z",
+  "host": {
+    "hostname": "srv-01"
+  },
+  "records": [
+    {
+      "result_id": "res_website.primary_latency",
+      "module": "website",
+      "check": "response_time",
+      "target": "https://example.net",
+      "status": "unknown",
+      "severity": "unknown",
+      "score": 40,
+      "summary": "Website check timed out before a complete result was collected.",
+      "details": [],
+      "recommendations": [
+        {
+          "code": "investigate_connectivity",
+          "summary": "Investigate network reachability and remote response time.",
+          "priority": "high",
+          "manual_action": true
+        }
+      ],
+      "metadata": {
+        "source": [
+          "network"
+        ],
+        "provenance": "Outbound HTTP check exceeded the configured timeout window.",
+        "privilege_requirement": "network_only",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": [
+          {
+            "name": "curl",
+            "required": false,
+            "available": true
+          }
+        ]
+      },
+      "errors": [
+        {
+          "category": "timeout",
+          "code": "HTTP_CHECK_TIMEOUT",
+          "message": "The website check exceeded the configured timeout."
+        }
+      ],
+      "duration_ms": 5000,
+      "observed_at": "2026-07-17T12:14:55Z"
+    }
+  ],
+  "exit_code": 7
+}

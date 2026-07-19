@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "document_type": "result",
+  "generated_at": "2026-07-17T12:00:00Z",
+  "records": [
+    {
+      "result_id": "res_health.cpu_snapshot",
+      "module": "health",
+      "check": "cpu_usage",
+      "target": "localhost",
+      "status": "ok",
+      "severity": "ok",
+      "score": 98,
+      "summary": "Line one\nLine two",
+      "details": [],
+      "recommendations": [],
+      "metadata": {
+        "source": [
+          "procfs"
+        ],
+        "provenance": "Derived from local procfs snapshot.",
+        "privilege_requirement": "none",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [],
+      "duration_ms": 184,
+      "observed_at": "2026-07-17T11:59:59Z"
+    }
+  ]
+}

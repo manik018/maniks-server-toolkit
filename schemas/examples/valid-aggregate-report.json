@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "document_type": "report",
+  "toolkit": "mst",
+  "toolkit_version": "0.1.0",
+  "command": "report",
+  "generated_at": "2026-07-17T12:20:00Z",
+  "host": {
+    "hostname": "srv-01",
+    "fqdn": "srv-01.example.net"
+  },
+  "records": [
+    {
+      "result_id": "res_health.cpu_snapshot",
+      "module": "health",
+      "check": "cpu_usage",
+      "target": "localhost",
+      "status": "ok",
+      "severity": "ok",
+      "score": 98,
+      "summary": "CPU usage is within threshold.",
+      "details": [],
+      "recommendations": [],
+      "metadata": {
+        "source": [
+          "procfs"
+        ],
+        "provenance": "Derived from local procfs snapshot.",
+        "privilege_requirement": "none",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [],
+      "duration_ms": 184,
+      "observed_at": "2026-07-17T12:19:55Z"
+    },
+    {
+      "result_id": "res_backup.age_daily",
+      "module": "backup",
+      "check": "backup_age",
+      "target": "/srv/backups",
+      "status": "warn",
+      "severity": "warning",
+      "score": 72,
+      "summary": "Latest backup is older than the preferred threshold.",
+      "details": [],
+      "recommendations": [
+        {
+          "code": "review_backup_schedule",
+          "summary": "Review backup job timing and completion.",
+          "priority": "medium",
+          "manual_action": true
+        }
+      ],
+      "metadata": {
+        "source": [
+          "filesystem",
+          "config"
+        ],
+        "provenance": "Computed from backup file timestamps and configured age policy.",
+        "privilege_requirement": "none",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [],
+      "duration_ms": 231,
+      "observed_at": "2026-07-17T12:19:58Z"
+    }
+  ],
+  "aggregate": {
+    "record_count": 2,
+    "overall_status": "warn",
+    "overall_severity": "warning",
+    "overall_score": 85,
+    "risk_level": "medium",
+    "module_summaries": [
+      {
+        "module": "health",
+        "record_count": 1,
+        "status": "ok",
+        "severity": "ok",
+        "score": 98
+      },
+      {
+        "module": "backup",
+        "record_count": 1,
+        "status": "warn",
+        "severity": "warning",
+        "score": 72
+      }
+    ]
+  },
+  "exit_code": 7
+}

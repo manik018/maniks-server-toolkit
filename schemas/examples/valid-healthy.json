@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "document_type": "result",
+  "toolkit": "mst",
+  "toolkit_version": "0.1.0",
+  "command": "health",
+  "generated_at": "2026-07-17T12:00:00Z",
+  "host": {
+    "hostname": "srv-01",
+    "fqdn": "srv-01.example.net"
+  },
+  "records": [
+    {
+      "result_id": "res_health.cpu_snapshot",
+      "module": "health",
+      "check": "cpu_usage",
+      "target": "localhost",
+      "status": "ok",
+      "severity": "ok",
+      "score": 98,
+      "summary": "CPU usage is within threshold.",
+      "details": [
+        {
+          "key": "cpu_percent",
+          "label": "CPU",
+          "value_type": "integer",
+          "value": 12,
+          "unit": "%",
+          "redacted": false
+        }
+      ],
+      "recommendations": [
+        {
+          "code": "no_action_required",
+          "summary": "No action required.",
+          "priority": "low",
+          "manual_action": false
+        }
+      ],
+      "metadata": {
+        "source": [
+          "procfs"
+        ],
+        "provenance": "Derived from local procfs snapshot.",
+        "privilege_requirement": "none",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [],
+      "duration_ms": 184,
+      "observed_at": "2026-07-17T11:59:59Z"
+    }
+  ],
+  "exit_code": 0
+}

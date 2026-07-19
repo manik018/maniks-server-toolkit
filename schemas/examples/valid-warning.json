@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "document_type": "result",
+  "toolkit": "mst",
+  "toolkit_version": "0.1.0",
+  "command": "backup",
+  "generated_at": "2026-07-17T12:05:00Z",
+  "host": {
+    "hostname": "srv-01"
+  },
+  "records": [
+    {
+      "result_id": "res_backup.age_daily",
+      "module": "backup",
+      "check": "backup_age",
+      "target": "/srv/backups",
+      "status": "warn",
+      "severity": "warning",
+      "score": 72,
+      "summary": "Latest backup is older than the preferred threshold.",
+      "details": [
+        {
+          "key": "age_hours",
+          "label": "Age",
+          "value_type": "integer",
+          "value": 31,
+          "unit": "hours",
+          "redacted": false
+        }
+      ],
+      "recommendations": [
+        {
+          "code": "review_backup_schedule",
+          "summary": "Review backup job timing and completion.",
+          "priority": "medium",
+          "manual_action": true
+        }
+      ],
+      "metadata": {
+        "source": [
+          "filesystem",
+          "config"
+        ],
+        "provenance": "Computed from backup file timestamps and configured age policy.",
+        "privilege_requirement": "none",
+        "contains_sensitive_data": false,
+        "redactions_present": false,
+        "optional_dependencies": []
+      },
+      "errors": [],
+      "duration_ms": 231,
+      "observed_at": "2026-07-17T12:04:58Z"
+    }
+  ],
+  "exit_code": 7
+}

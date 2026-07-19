@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# MST foundation entrypoint.
+set -euo pipefail
+umask 027
+
+resolve_runtime_root() {
+    local script_dir candidate canonical_root
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    for candidate in "${script_dir}" "/usr/local/lib/mst"; do
+        [[ -d "${candidate}" ]] || continue
+        canonical_root="$(readlink -f -- "${candidate}")" || continue
+        [[ -f "${canonical_root}/lib/bootstrap.sh" ]] || continue
+        [[ -f "${canonical_root}/lib/runtime.sh" ]] || continue
+        [[ -f "${canonical_root}/lib/errors.sh" ]] || continue
+        [[ -f "${canonical_root}/commands/help.sh" ]] || continue
+        [[ -f "${canonical_root}/mst" ]] || continue
+        printf '%s' "${canonical_root}"
+        return 0
+    done
+
+    printf 'MST runtime root could not be resolved safely.\n' >&2
+    exit 1
+}
+
+# Trust boundary: MST_ROOT is resolved internally and never taken from the environment.
+readonly MST_ROOT="$(resolve_runtime_root)"
+export MST_ROOT
+
+# shellcheck source=lib/bootstrap.sh
+source "${MST_ROOT}/lib/bootstrap.sh"
+
+mst_bootstrap "${MST_ROOT}"
+mst_dispatch "$@"
