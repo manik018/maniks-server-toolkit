@@ -124,6 +124,17 @@ mst_report_json_for_env() {
     printf '%s' "${json_ref:-}"
 }
 
+# Load persisted aggregate reports for every known module when no in-process value exists.
+mst_report_load_persisted_reports() {
+    local key _label env_name
+
+    while IFS='|' read -r key _label env_name; do
+        if [[ -z "$(mst_report_json_for_env "${env_name}")" ]]; then
+            mst_state_load_report "${key}" "${env_name}" || true
+        fi
+    done < <(mst_report_module_catalog)
+}
+
 # Return success if one payload looks like a normalized MRRF1 aggregate report.
 mst_report_validate_mrrf_report() {
     local module_key="${1:?module required}"
@@ -242,9 +253,7 @@ mst_report_collect() {
     declare -ga MST_REPORT_STATUS_VALUES=()
 
     mst_report_load_argument_reports "$@"
-    if [[ -z "${MST_HEALTH_REPORT_JSON:-}" ]]; then
-        mst_state_load_report health MST_HEALTH_REPORT_JSON || true
-    fi
+    mst_report_load_persisted_reports
 
     while IFS='|' read -r key label env_name; do
         total_modules=$(( total_modules + 1 ))

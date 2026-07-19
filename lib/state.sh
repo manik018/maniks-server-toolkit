@@ -11,7 +11,7 @@ mst_state_report_path() {
 
     [[ -n "${MST_STATE_DIR:-}" ]] || return 1
     case "${module_key}" in
-        health)
+        health|services|security|website|wordpress|backup)
             printf '%s/reports/%s.mrrf1.json' "${MST_STATE_DIR:?state dir required}" "${module_key}"
             ;;
         *)
