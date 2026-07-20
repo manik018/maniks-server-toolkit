@@ -12,6 +12,7 @@ required_executables=(
     "mst"
     "install.sh"
     "uninstall.sh"
+    "scripts/mst-daily-report.sh"
     "scripts/release-check.sh"
     "scripts/restore-executable-bits.sh"
     "scripts/shellcheck.sh"

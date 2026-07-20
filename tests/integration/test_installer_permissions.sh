@@ -20,6 +20,7 @@ make_source_tree() {
         "${SOURCE_DIR}/renderers" \
         "${SOURCE_DIR}/delivery" \
         "${SOURCE_DIR}/config" \
+        "${SOURCE_DIR}/scripts" \
         "${SOURCE_DIR}/templates" \
         "${SOURCE_DIR}/docs" \
         "${SOURCE_DIR}/schemas"
@@ -31,6 +32,7 @@ make_source_tree() {
     printf 'printf renderer\n' > "${SOURCE_DIR}/renderers/health_text.sh"
     printf 'printf delivery\n' > "${SOURCE_DIR}/delivery/telegram.sh"
     printf 'MST_CONFIG_SCHEMA_VERSION="1"\n' > "${SOURCE_DIR}/config/config.conf.example"
+    printf '#!/usr/bin/env bash\nprintf daily\n' > "${SOURCE_DIR}/scripts/mst-daily-report.sh"
     printf 'logrotate\n' > "${SOURCE_DIR}/templates/logrotate.conf"
     printf 'cron\n' > "${SOURCE_DIR}/templates/mst.cron.example"
     printf 'docs\n' > "${SOURCE_DIR}/docs/readme.md"
@@ -182,14 +184,16 @@ assert_mode() {
 
 assert_no_writable_paths() {
     local root="${1:?root required}"
-    if find "${root}" -type d -perm /022 | grep -q .; then
-        printf 'group/world writable directory remained under %s\n' "${root}" >&2
-        exit 1
-    fi
-    if find "${root}" -type f -perm /022 | grep -q .; then
-        printf 'group/world writable file remained under %s\n' "${root}" >&2
-        exit 1
-    fi
+    local target mode group_digit other_digit
+    while IFS= read -r -d '' target; do
+        mode="$(path_mode "${target}")"
+        group_digit="${mode: -2:1}"
+        other_digit="${mode: -1}"
+        if (( (10#${group_digit} & 2) != 0 )) || (( (10#${other_digit} & 2) != 0 )); then
+            printf 'group/world writable path remained under %s: %s\n' "${root}" "${target}" >&2
+            exit 1
+        fi
+    done < <(find "${root}" \( -type d -o -type f \) -print0)
 }
 
 make_source_tree
@@ -210,6 +214,7 @@ assert_mode "${LIB_DIR}" 755
 assert_mode "${LIB_DIR}/lib" 755
 assert_mode "${LIB_DIR}/lib/runtime.sh" 644
 assert_mode "${LIB_DIR}/commands/health.sh" 644
+assert_mode "${LIB_DIR}/scripts/mst-daily-report.sh" 755
 assert_mode "${LIB_DIR}/mst" 755
 assert_mode "${BIN_DIR}/mst" 755
 assert_mode "${CONFIG_DIR}" 750
@@ -227,6 +232,7 @@ assert_no_writable_paths "${LIB_DIR}"
 umask 077
 run_install_steps
 assert_mode "${LIB_DIR}/lib/runtime.sh" 644
+assert_mode "${LIB_DIR}/scripts/mst-daily-report.sh" 755
 assert_mode "${LIB_DIR}/mst" 755
 assert_mode "${CONFIG_DIR}/config.conf" 640
 assert_no_writable_paths "${LIB_DIR}"

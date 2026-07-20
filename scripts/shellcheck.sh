@@ -15,6 +15,7 @@ shellcheck \
     "${ROOT_DIR}/uninstall.sh" \
     "${ROOT_DIR}/lib/"*.sh \
     "${ROOT_DIR}/commands/"*.sh \
+    "${ROOT_DIR}/scripts/"*.sh \
     "${ROOT_DIR}/tests/"*.sh \
     "${ROOT_DIR}/tests/unit/"*.sh \
     "${ROOT_DIR}/tests/integration/"*.sh

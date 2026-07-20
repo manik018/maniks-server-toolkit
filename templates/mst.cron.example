@@ -1,3 +1,6 @@
-# MST foundation phase
-# No scheduled jobs are installed during foundation implementation.
-# Future monitoring phases may provide reviewed cron entries here.
+# MST daily monitoring cron example.
+# Cron uses the server-local timezone.
+# Copy this file to /etc/cron.d/mst with mode 0644 and owner root.
+#
+# Run as root daily at 08:00 server local time.
+0 8 * * * root /usr/local/lib/mst/scripts/mst-daily-report.sh >/dev/null 2>&1

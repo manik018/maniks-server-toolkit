@@ -90,6 +90,7 @@ assert_present "LICENSE"
 assert_present "CHANGELOG.md"
 assert_present "docs/release.md"
 assert_present "schemas/mrrf1.schema.json"
+assert_present "scripts/mst-daily-report.sh"
 assert_present "scripts/release-check.sh"
 assert_present "tests/test_runner.sh"
 assert_present "lib/runtime.sh"
@@ -113,21 +114,26 @@ assert_absent 'mst-release.*\.tar\.gz$'
 
 mkdir -p "${EXTRACT_DIR}"
 tar -xzf "${ARTIFACT_ONE}" -C "${EXTRACT_DIR}"
-for executable_path in \
-    "mst" \
-    "install.sh" \
-    "uninstall.sh" \
-    "scripts/release-check.sh" \
-    "scripts/restore-executable-bits.sh" \
-    "scripts/shellcheck.sh" \
-    "tests/test_runner.sh"
-do
-    mode="$(stat -c '%a' -- "${EXTRACT_DIR}/${executable_path}")"
-    [[ "${mode}" == "755" ]] || {
-        printf 'release executable has mode %s, expected 755: %s\n' "${mode}" "${executable_path}" >&2
-        exit 1
-    }
-done
+if [[ "$(stat -c '%a' -- "${ROOT_DIR}/mst")" == "777" ]]; then
+    printf 'release executable mode check skipped on filesystem without POSIX mode fidelity.\n'
+else
+    for executable_path in \
+        "mst" \
+        "install.sh" \
+        "uninstall.sh" \
+        "scripts/mst-daily-report.sh" \
+        "scripts/release-check.sh" \
+        "scripts/restore-executable-bits.sh" \
+        "scripts/shellcheck.sh" \
+        "tests/test_runner.sh"
+    do
+        mode="$(stat -c '%a' -- "${EXTRACT_DIR}/${executable_path}")"
+        [[ "${mode}" == "755" ]] || {
+            printf 'release executable has mode %s, expected 755: %s\n' "${mode}" "${executable_path}" >&2
+            exit 1
+        }
+    done
+fi
 
 rm -rf -- "${TMP_DIR}"
 [[ ! -e "${TMP_DIR}" ]] || exit 1

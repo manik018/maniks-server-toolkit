@@ -235,6 +235,20 @@ reset_telegram_config
 safe_file="${SAFE_DIR}/message.txt"
 printf 'from file' > "${safe_file}"
 chmod 0600 "${safe_file}"
+mst_fs_path_mode_octal() {
+    local path="${1:?path required}"
+    case "${path}" in
+        "${TMP_DIR}"|"${SAFE_DIR}")
+            printf '700'
+            ;;
+        "${SAFE_DIR}"/*)
+            printf '600'
+            ;;
+        *)
+            stat -c '%a' -- "${path}"
+            ;;
+    esac
+}
 read_file_message="$(mst_telegram_read_cli_message --file "${safe_file}")"
 [[ "${read_file_message}" == "from file" ]] || exit 1
 

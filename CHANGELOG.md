@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+
+- All monitoring module commands now persist MRRF1 aggregate reports to the state directory.
+- The unified report engine discovers persisted reports for all six modules.
+
 ## 0.1.0 - 2026-07-17
 
 - Architecture approved and frozen.

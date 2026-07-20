@@ -315,7 +315,7 @@ create_directories() {
     local path
     for path in "${BIN_DIR}" "${LIB_DIR}" \
         "${LIB_DIR}/lib" "${LIB_DIR}/commands" "${LIB_DIR}/inspectors" "${LIB_DIR}/renderers" "${LIB_DIR}/delivery" \
-        "${LIB_DIR}/config" "${LIB_DIR}/templates" "${LIB_DIR}/docs" "${LIB_DIR}/schemas"; do
+        "${LIB_DIR}/config" "${LIB_DIR}/scripts" "${LIB_DIR}/templates" "${LIB_DIR}/docs" "${LIB_DIR}/schemas"; do
         create_secure_dir "${path}" 0755
     done
     create_secure_dir "${CONFIG_DIR}" 0750 "${RUNTIME_WRITE_GROUP}"
@@ -379,6 +379,7 @@ install_runtime() {
     copy_tree "${PROJECT_ROOT}/renderers" "${LIB_DIR}/renderers"
     copy_tree "${PROJECT_ROOT}/delivery" "${LIB_DIR}/delivery"
     copy_tree "${PROJECT_ROOT}/config" "${LIB_DIR}/config"
+    install_secure_file "${PROJECT_ROOT}/scripts/mst-daily-report.sh" "${LIB_DIR}/scripts/mst-daily-report.sh" 0755
     copy_tree "${PROJECT_ROOT}/templates" "${LIB_DIR}/templates"
     copy_tree "${PROJECT_ROOT}/docs" "${LIB_DIR}/docs"
     copy_tree "${PROJECT_ROOT}/schemas" "${LIB_DIR}/schemas"
@@ -500,7 +501,8 @@ verify_runtime_tree_permissions() {
 
     while IFS= read -r -d '' target; do
         case "${target}" in
-            "${LIB_DIR}/mst")
+            "${LIB_DIR}/mst"|\
+            "${LIB_DIR}/scripts/mst-daily-report.sh")
                 verify_installed_path "${target}" 0755 || failed=1
                 ;;
             *)

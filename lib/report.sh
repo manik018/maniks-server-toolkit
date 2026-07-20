@@ -47,6 +47,20 @@ mst_report_json_number_field() {
     sed -n "s/.*\"${field_name}\"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p" <<< "${json_payload}" | head -n 1
 }
 
+# Extract a numeric detail value from one MST-generated compact record object.
+mst_report_json_detail_number() {
+    local record_json="${1:-}"
+    local detail_key="${2:?key required}"
+    sed -n "s/.*\"key\":\"${detail_key}\",\"label\":\"[^\"]*\",\"value_type\":\"[^\"]*\",\"value\":\\([0-9][0-9]*\\).*/\\1/p" <<< "${record_json}" | head -n 1
+}
+
+# Extract a string detail value from one MST-generated compact record object.
+mst_report_json_detail_string() {
+    local record_json="${1:-}"
+    local detail_key="${2:?key required}"
+    sed -n "s/.*\"key\":\"${detail_key}\",\"label\":\"[^\"]*\",\"value_type\":\"[^\"]*\",\"value\":\"\\([^\"]*\\)\".*/\\1/p" <<< "${record_json}" | sed 's/\\"/"/g; s/\\\\/\\/g' | head -n 1
+}
+
 # Return the records array payload from one aggregate report.
 mst_report_records_payload() {
     local json_payload="${1:-}"
@@ -77,8 +91,12 @@ mst_report_add_record_row() {
     local target_name="${2:-module report}"
     local status_name="${3:-unknown}"
     local summary_text="${4:-No summary available.}"
+    local check_name="${5:-}"
+    local record_json="${6:-}"
 
     MST_REPORT_RECORD_ROWS+=("$(mst_mrrf_sanitize_text "${module_key}" 32)${MST_MRRF_FIELD_SEPARATOR}$(mst_mrrf_sanitize_text "${target_name}" 48)${MST_MRRF_FIELD_SEPARATOR}$(mst_report_normalize_status "${status_name}")${MST_MRRF_FIELD_SEPARATOR}$(mst_mrrf_sanitize_text "${summary_text}" 120)")
+    MST_REPORT_RECORD_CHECKS+=("$(mst_mrrf_sanitize_text "${check_name}" 48)")
+    MST_REPORT_RECORD_JSON+=("${record_json}")
 }
 
 # Append one module summary row for terminal rendering.
@@ -166,7 +184,7 @@ mst_report_consume_module_report() {
     local module_key="${1:?module required}"
     local label="${2:?label required}"
     local json_payload="${3:?json required}"
-    local records_payload record_object target_name status_name summary_text aggregate_status
+    local records_payload record_object target_name status_name summary_text check_name aggregate_status
     local ok_count=0 warn_count=0 critical_count=0 unavailable_count=0 unknown_count=0 record_count=0
     local normalized_status
 
@@ -179,6 +197,7 @@ mst_report_consume_module_report() {
         target_name="$(mst_report_json_string_field "${record_object}" "target")"
         status_name="$(mst_report_json_string_field "${record_object}" "status")"
         summary_text="$(mst_report_json_string_field "${record_object}" "summary")"
+        check_name="$(mst_report_json_string_field "${record_object}" "check")"
         normalized_status="$(mst_report_normalize_status "${status_name}")"
         case "${normalized_status}" in
             ok) ok_count=$(( ok_count + 1 )) ;;
@@ -188,7 +207,7 @@ mst_report_consume_module_report() {
             *) unknown_count=$(( unknown_count + 1 )) ;;
         esac
         record_count=$(( record_count + 1 ))
-        mst_report_add_record_row "${module_key}" "${target_name:-record}" "${normalized_status}" "${summary_text:-No summary available.}"
+        mst_report_add_record_row "${module_key}" "${target_name:-record}" "${normalized_status}" "${summary_text:-No summary available.}" "${check_name}" "${record_object}"
     done < <(mst_report_each_record_object "${records_payload}")
 
     if (( record_count == 0 )); then
@@ -250,6 +269,8 @@ mst_report_collect() {
 
     declare -ga MST_REPORT_MODULE_SUMMARIES=()
     declare -ga MST_REPORT_RECORD_ROWS=()
+    declare -ga MST_REPORT_RECORD_CHECKS=()
+    declare -ga MST_REPORT_RECORD_JSON=()
     declare -ga MST_REPORT_STATUS_VALUES=()
 
     mst_report_load_argument_reports "$@"
@@ -283,6 +304,12 @@ mst_report_collect() {
     export MST_REPORT_HOSTNAME="${report_hostname}"
     export MST_REPORT_TIMESTAMP="$(mst_mrrf_now_utc)"
     export MST_REPORT_STATUS="$(mst_report_worst_status MST_REPORT_STATUS_VALUES)"
+    case "${MST_REPORT_STATUS}" in
+        ok) export MST_REPORT_OVERALL="HEALTHY" ;;
+        warn) export MST_REPORT_OVERALL="WARNING" ;;
+        critical) export MST_REPORT_OVERALL="CRITICAL" ;;
+        *) export MST_REPORT_OVERALL="ATTENTION" ;;
+    esac
     export MST_REPORT_TOTAL_MODULES="${total_modules}"
     export MST_REPORT_TOTAL_RECORDS="${total_records}"
     export MST_REPORT_TOTAL_OK="${total_ok}"
