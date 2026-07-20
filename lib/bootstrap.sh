@@ -49,6 +49,8 @@ mst_bootstrap() {
     source "${MST_LIB_DIR}/logging.sh"
     # shellcheck source=lib/exec.sh
     source "${MST_LIB_DIR}/exec.sh"
+    # shellcheck source=lib/discover.sh
+    source "${MST_LIB_DIR}/discover.sh"
     # shellcheck source=lib/mrrf.sh
     source "${MST_LIB_DIR}/mrrf.sh"
     # shellcheck source=lib/config.sh

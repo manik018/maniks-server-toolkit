@@ -8,6 +8,7 @@ source "${MST_INSPECTOR_DIR}/website/common.sh"
 # Apply default configuration for WordPress collectors.
 mst_wordpress_init_defaults() {
     export MST_WORDPRESS_TARGETS="${MST_WORDPRESS_TARGETS:-}"
+    export MST_WORDPRESS_AUTO_DISCOVER="${MST_WORDPRESS_AUTO_DISCOVER:-no}"
     export MST_WORDPRESS_CRON_OVERDUE_WARN_COUNT="${MST_WORDPRESS_CRON_OVERDUE_WARN_COUNT:-0}"
     export MST_WORDPRESS_TIMEOUT_SECONDS="${MST_WORDPRESS_TIMEOUT_SECONDS:-${MST_TIMEOUT_SECONDS:-${MST_DEFAULT_TIMEOUT_SECONDS}}}"
 }
@@ -32,9 +33,11 @@ mst_wordpress_trim() {
 mst_wordpress_targets_catalog() {
     local spec="${MST_WORDPRESS_TARGETS:-}"
     local entry trimmed name url document_root wp_config_path wp_cli_path enabled
+    local discovered_name discovered_root discovered_url
     local old_ifs="${IFS}"
+    local -A configured_names=()
+    local -A configured_urls=()
 
-    [[ -z "${spec}" ]] && return 0
     IFS=';'
     for entry in ${spec}; do
         trimmed="${entry#"${entry%%[![:space:]]*}"}"
@@ -43,6 +46,8 @@ mst_wordpress_targets_catalog() {
         IFS='|' read -r name url document_root wp_config_path wp_cli_path enabled <<< "${trimmed}"
         [[ -n "${wp_cli_path:-}" ]] || wp_cli_path="wp"
         [[ -n "${enabled:-}" ]] || enabled="true"
+        configured_names["${name}"]=1
+        configured_urls["${url}"]=1
         printf '%s|%s|%s|%s|%s|%s\n' \
             "${name}" \
             "${url}" \
@@ -52,6 +57,21 @@ mst_wordpress_targets_catalog() {
             "$(mst_wordpress_normalize_boolean "${enabled}")"
     done
     IFS="${old_ifs}"
+
+    [[ "$(mst_wordpress_normalize_boolean "${MST_WORDPRESS_AUTO_DISCOVER:-no}")" == "true" ]] || return 0
+    while IFS='|' read -r discovered_name discovered_root || [[ -n "${discovered_name:-}${discovered_root:-}" ]]; do
+        [[ -n "${discovered_name:-}" ]] || continue
+        mst_discover_site_is_wordpress "${discovered_root}" || continue
+        discovered_url="https://${discovered_name}"
+        [[ -z "${configured_names[${discovered_name}]:-}" ]] || continue
+        [[ -z "${configured_urls[${discovered_url}]:-}" ]] || continue
+        configured_names["${discovered_name}"]=1
+        configured_urls["${discovered_url}"]=1
+        printf '%s|%s|%s||wp|true\n' \
+            "${discovered_name}" \
+            "${discovered_url}" \
+            "${discovered_root}"
+    done < <(mst_discover_web_sites)
 }
 
 # Create a stable result identifier fragment from a site name.

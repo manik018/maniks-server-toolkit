@@ -151,6 +151,35 @@ mst_report_telegram_disk_max_percent() {
     printf '%s' "${max_usage}"
 }
 
+mst_report_telegram_disk_root_usage() {
+    local record_json fs_index detail_value mount_point device total_mib used_mib avail_mib usage_text inode_label inode_usage
+    local total_value used_value usage_value total_gb used_gb first_result=""
+
+    record_json="$(mst_report_telegram_health_record_json disk_usage)" || return 0
+    for fs_index in $(seq 1 99); do
+        detail_value="$(mst_report_json_detail_string "${record_json}" "fs_$(printf '%02d' "${fs_index}")")"
+        [[ -n "${detail_value}" ]] || continue
+        read -r mount_point device total_mib used_mib avail_mib usage_text inode_label inode_usage <<< "${detail_value}" || continue
+        [[ -n "${device}" && -n "${avail_mib}" && "${inode_label}" == "inode" && -n "${inode_usage}" ]] || continue
+        [[ "${total_mib}" =~ ^([0-9]+)MiB$ ]] || continue
+        total_value="${BASH_REMATCH[1]}"
+        [[ "${used_mib}" =~ ^([0-9]+)MiB$ ]] || continue
+        used_value="${BASH_REMATCH[1]}"
+        [[ "${usage_text}" =~ ^([0-9]+)%$ ]] || continue
+        usage_value="${BASH_REMATCH[1]}"
+        total_gb="$(awk -v mib="${total_value}" 'BEGIN { printf "%.1f", mib / 1024 }')"
+        used_gb="$(awk -v mib="${used_value}" 'BEGIN { printf "%.1f", mib / 1024 }')"
+        if [[ "${mount_point}" == "/" ]]; then
+            printf '%s|%s|%s' "${used_gb}" "${total_gb}" "${usage_value}"
+            return 0
+        fi
+        if [[ -z "${first_result}" ]]; then
+            first_result="${used_gb}|${total_gb}|${usage_value}"
+        fi
+    done
+    printf '%s' "${first_result}"
+}
+
 mst_report_telegram_disk_label() {
     case "$(mst_report_telegram_health_record_status disk_usage || true)" in
         critical) printf 'CRITICAL' ;;
@@ -202,7 +231,7 @@ mst_report_telegram_is_effectively_unconfigured() {
 }
 
 mst_render_report_telegram_full() {
-    local cpu_percent memory_summary disk_label filesystem_count load_1m load_5m load_15m uptime_seconds uptime_text module_status
+    local cpu_percent memory_summary disk_label filesystem_count disk_usage _used_gb _total_gb usage_percent load_1m load_5m load_15m uptime_seconds uptime_text module_status
 
     printf '%s Manik'\''s Server Toolkit v%s\n\n' "$(mst_report_telegram_status_dot "${MST_REPORT_STATUS}")" "${MST_VERSION}"
     printf '📍 Server\n'
@@ -228,7 +257,13 @@ mst_render_report_telegram_full() {
     disk_label="$(mst_report_telegram_disk_label)"
     filesystem_count="$(mst_report_telegram_health_detail_number disk_usage filesystem_count)"
     if [[ -n "${filesystem_count}" ]]; then
-        printf 'Disk: %s (%s filesystems)\n' "${disk_label}" "${filesystem_count}"
+        disk_usage="$(mst_report_telegram_disk_root_usage)"
+        if [[ -n "${disk_usage}" ]]; then
+            IFS='|' read -r _used_gb _total_gb usage_percent <<< "${disk_usage}"
+            printf 'Disk: %s (%s filesystems, root %s%% used)\n' "${disk_label}" "${filesystem_count}" "${usage_percent}"
+        else
+            printf 'Disk: %s (%s filesystems)\n' "${disk_label}" "${filesystem_count}"
+        fi
     fi
     load_1m="$(mst_report_telegram_health_detail_string cpu_usage load_1m)"
     load_5m="$(mst_report_telegram_health_detail_string cpu_usage load_5m)"
@@ -310,13 +345,19 @@ mst_render_report_telegram_digest() {
     printf '%s Daily Server Report\n\n' "$(mst_report_telegram_status_dot "${MST_REPORT_STATUS}")"
     printf 'Overall: %s\n\n' "${MST_REPORT_OVERALL}"
 
-    local cpu_percent memory_summary disk_label
+    local cpu_percent memory_summary disk_label disk_usage used_gb total_gb usage_percent
     cpu_percent="$(mst_report_telegram_health_detail_number cpu_usage cpu_percent)"
     [[ -n "${cpu_percent}" ]] && printf 'CPU: %s%%\n' "${cpu_percent}"
     memory_summary="$(mst_report_telegram_health_record_summary memory_usage || true)"
     [[ "${memory_summary}" =~ Memory\ utilization\ is\ ([0-9]+)% ]] && printf 'Memory: %s%%\n' "${BASH_REMATCH[1]}"
     disk_label="$(mst_report_telegram_disk_label)"
-    printf 'Disk: %s\n\n' "${disk_label}"
+    disk_usage="$(mst_report_telegram_disk_root_usage)"
+    if [[ -n "${disk_usage}" ]]; then
+        IFS='|' read -r used_gb total_gb usage_percent <<< "${disk_usage}"
+        printf 'Disk: %s (%s GB / %s GB, %s%%)\n\n' "${disk_label}" "${used_gb}" "${total_gb}" "${usage_percent}"
+    else
+        printf 'Disk: %s\n\n' "${disk_label}"
+    fi
 
     printf 'Services:\n'
     if ! summary="$(mst_report_telegram_module_summary services)"; then

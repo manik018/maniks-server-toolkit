@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Shared helpers for the website module.
 
+# shellcheck source=lib/discover.sh
+source "${MST_LIB_DIR}/discover.sh"
+
 # Apply default configuration for website collectors.
 mst_website_init_defaults() {
     export MST_WEBSITE_TARGETS="${MST_WEBSITE_TARGETS:-}"
+    export MST_WEBSITE_AUTO_DISCOVER="${MST_WEBSITE_AUTO_DISCOVER:-no}"
     export MST_WEBSITE_RESPONSE_WARN_MS="${MST_WEBSITE_RESPONSE_WARN_MS:-2000}"
     export MST_WEBSITE_TLS_EXPIRY_WARN_DAYS="${MST_WEBSITE_TLS_EXPIRY_WARN_DAYS:-14}"
     export MST_WEBSITE_REDIRECT_WARN_COUNT="${MST_WEBSITE_REDIRECT_WARN_COUNT:-0}"
@@ -21,9 +25,11 @@ mst_website_normalize_boolean() {
 mst_website_targets_catalog() {
     local spec="${MST_WEBSITE_TARGETS:-}"
     local entry trimmed name url expected_status timeout_seconds follow_redirects enabled
+    local discovered_name _document_root discovered_url
     local old_ifs="${IFS}"
+    local -A configured_names=()
+    local -A configured_urls=()
 
-    [[ -z "${spec}" ]] && return 0
     IFS=';'
     for entry in ${spec}; do
         trimmed="${entry#"${entry%%[![:space:]]*}"}"
@@ -31,7 +37,10 @@ mst_website_targets_catalog() {
         [[ -n "${trimmed}" ]] || continue
         IFS='|' read -r name url expected_status timeout_seconds follow_redirects enabled <<< "${trimmed}"
         [[ -n "${expected_status:-}" ]] || expected_status="200"
+        [[ -n "${timeout_seconds:-}" ]] || timeout_seconds="${MST_TIMEOUT_SECONDS:-${MST_DEFAULT_TIMEOUT_SECONDS}}"
         [[ -n "${enabled:-}" ]] || enabled="true"
+        configured_names["${name}"]=1
+        configured_urls["${url}"]=1
         printf '%s|%s|%s|%s|%s|%s\n' \
             "${name}" \
             "${url}" \
@@ -41,6 +50,20 @@ mst_website_targets_catalog() {
             "$(mst_website_normalize_boolean "${enabled}")"
     done
     IFS="${old_ifs}"
+
+    [[ "$(mst_website_normalize_boolean "${MST_WEBSITE_AUTO_DISCOVER:-no}")" == "true" ]] || return 0
+    while IFS='|' read -r discovered_name _document_root || [[ -n "${discovered_name:-}${_document_root:-}" ]]; do
+        [[ -n "${discovered_name:-}" ]] || continue
+        discovered_url="https://${discovered_name}"
+        [[ -z "${configured_names[${discovered_name}]:-}" ]] || continue
+        [[ -z "${configured_urls[${discovered_url}]:-}" ]] || continue
+        configured_names["${discovered_name}"]=1
+        configured_urls["${discovered_url}"]=1
+        printf '%s|%s|200|%s|true|true\n' \
+            "${discovered_name}" \
+            "${discovered_url}" \
+            "${MST_TIMEOUT_SECONDS:-${MST_DEFAULT_TIMEOUT_SECONDS}}"
+    done < <(mst_discover_web_sites)
 }
 
 # Parse a simple HTTP or HTTPS URL into scheme, host, port, and path.

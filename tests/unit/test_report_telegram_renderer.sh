@@ -51,7 +51,7 @@ make_report_from_records() {
 set_ok_fixture() {
     local cpu_details memory_record disk_details uptime_details
     cpu_details='[{"key":"cpu_percent","label":"CPU Utilization","value_type":"integer","value":12,"unit":"%","sensitive":false},{"key":"load_1m","label":"Load Average 1m","value_type":"string","value":"0.10","unit":"","sensitive":false},{"key":"load_5m","label":"Load Average 5m","value_type":"string","value":"0.20","unit":"","sensitive":false},{"key":"load_15m","label":"Load Average 15m","value_type":"string","value":"0.30","unit":"","sensitive":false}]'
-    disk_details='[{"key":"fs_01","label":"Filesystem 1","value_type":"string","value":"/ /dev/sda1 1000MiB 200MiB 800MiB 20% inode 10%","unit":"","sensitive":false},{"key":"filesystem_count","label":"Filesystem Count","value_type":"integer","value":1,"unit":"","sensitive":false}]'
+    disk_details='[{"key":"fs_01","label":"Filesystem 1","value_type":"string","value":"/ /dev/vda 258019MiB 8773MiB 10203MiB 3% inode 1%","unit":"","sensitive":false},{"key":"filesystem_count","label":"Filesystem Count","value_type":"integer","value":1,"unit":"","sensitive":false}]'
     uptime_details='[{"key":"uptime_seconds","label":"Uptime","value_type":"integer","value":3660,"unit":"seconds","sensitive":false}]'
     memory_record="$(make_record health memory memory_usage localhost ok 'Memory utilization is 30% with 700 MiB available.' '[]')"
 
@@ -97,6 +97,7 @@ set -e
 
 digest_output="$(capture_report --style digest)"
 [[ "${digest_output}" == *"Daily Server Report"* ]] || exit 1
+[[ "${digest_output}" == *"Disk: OK ("*"GB /"*"3%)"* ]] || exit 1
 [[ "${digest_output}" == *"No critical issues detected."* ]] || exit 1
 
 auto_ok_output="$(capture_report --style auto)"
