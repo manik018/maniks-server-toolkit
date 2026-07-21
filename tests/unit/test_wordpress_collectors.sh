@@ -142,21 +142,21 @@ mst_wordpress_wp_cli_capture() {
         "https://example.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\nseo,inactive,none\n' ;;
         "https://example.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
         "https://example.test|cron event list --due-now --format=count") printf '0\n' ;;
-        "https://example.test|maintenance-mode status") printf 'inactive\n' ;;
+        "https://example.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://rest-down.test|core version") printf '6.6.0\n' ;;
         "https://rest-down.test|core check-update --format=count") printf '0\n' ;;
         "https://rest-down.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\n' ;;
         "https://rest-down.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
         "https://rest-down.test|cron event list --due-now --format=count") printf '0\n' ;;
-        "https://rest-down.test|maintenance-mode status") printf 'inactive\n' ;;
+        "https://rest-down.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://db-fail.test|core version") printf '6.6.0\n' ;;
         "https://db-fail.test|core check-update --format=count") printf '0\n' ;;
         "https://db-fail.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\n' ;;
         "https://db-fail.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
         "https://db-fail.test|cron event list --due-now --format=count") printf '0\n' ;;
-        "https://db-fail.test|maintenance-mode status") printf 'inactive\n' ;;
+        "https://db-fail.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://missing.test|core version") printf '' ;;
         "https://updates.test|core version") printf '6.6.0\n' ;;
@@ -164,7 +164,7 @@ mst_wordpress_wp_cli_capture() {
         "https://updates.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,available\nseo,inactive,none\n' ;;
         "https://updates.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,available\n' ;;
         "https://updates.test|cron event list --due-now --format=count") printf '3\n' ;;
-        "https://updates.test|maintenance-mode status") printf 'active\n' ;;
+        "https://updates.test|maintenance-mode status") printf 'Maintenance mode is active.\n' ;;
         *)
             return 1
             ;;
@@ -201,6 +201,10 @@ declare -A ok_record=()
 declare -a ok_details=() ok_errors=() ok_rows=()
 mst_wordpress_collect_site 1 "Main WP" "https://example.test" "${SITE_DIR}" "${SITE_DIR}/wp-config.php" "wp" "true" ok_record ok_details ok_errors ok_rows
 [[ "${ok_record[status]}" == "ok" ]] || exit 1
+if printf '%s\n' "${ok_errors[@]:-}" | grep -q 'WORDPRESS_MAINTENANCE_MODE'; then
+    printf 'inactive maintenance mode output should not trigger maintenance error.\n' >&2
+    exit 1
+fi
 
 declare -A missing_record=()
 declare -a missing_details=() missing_errors=() missing_rows=()
@@ -248,6 +252,10 @@ declare -a updates_details=() updates_errors=() updates_rows=()
 mst_wordpress_collect_site 6 "Updates WP" "https://updates.test" "${SITE_DIR}" "${SITE_DIR}/wp-config.php" "wp" "true" updates_record updates_details updates_errors updates_rows
 [[ "${updates_record[status]}" == "critical" ]] || exit 1
 [[ "${updates_record[summary]}" == *"error condition"* ]] || exit 1
+printf '%s\n' "${updates_errors[@]}" | grep -q 'WORDPRESS_MAINTENANCE_MODE' || {
+    printf 'active maintenance mode output should trigger maintenance error.\n' >&2
+    exit 1
+}
 
 cat > "${SITE_DIR}/wp-config.php" <<'EOF'
 <?php

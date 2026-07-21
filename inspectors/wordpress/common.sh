@@ -616,7 +616,7 @@ mst_wordpress_collect_site() {
             maintenance_status="$(mst_wordpress_wp_cli_capture "${wp_cli_path}" "${document_root}" "${site_url}" "${MST_WORDPRESS_TIMEOUT_SECONDS}" maintenance-mode status 2>/dev/null || true)"
             maintenance_status="${maintenance_status,,}"
             maintenance_status="${maintenance_status%$'\r'}"
-            if [[ "${maintenance_status}" == *"inactive"* ]]; then
+            if [[ "${maintenance_status}" == *"not active"* ]] || [[ "${maintenance_status}" == *"not_active"* ]]; then
                 maintenance_status="inactive"
             elif [[ "${maintenance_status}" == *"active"* ]]; then
                 maintenance_status="active"
