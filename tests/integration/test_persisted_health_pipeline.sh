@@ -180,6 +180,7 @@ run_alert_process() {
         export MST_ALERT_ON_UNAVAILABLE="true"
         export MST_ALERT_ON_UNKNOWN="true"
         export MST_ALERT_MODULES="all"
+        export MST_ALERT_MIN_OCCURRENCES_BEFORE_DELIVERY="2"
         export MST_ALERT_COOLDOWN_SECONDS="3600"
         export MST_ALERT_RECOVERY_ENABLED="true"
         export MST_ALERT_REPEAT_ENABLED="false"

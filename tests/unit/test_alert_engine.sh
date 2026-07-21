@@ -62,6 +62,7 @@ reset_alert_config() {
     export MST_ALERT_ON_UNAVAILABLE="true"
     export MST_ALERT_ON_UNKNOWN="true"
     export MST_ALERT_MODULES="all"
+    export MST_ALERT_MIN_OCCURRENCES_BEFORE_DELIVERY="2"
     export MST_ALERT_COOLDOWN_SECONDS="3600"
     export MST_ALERT_RECOVERY_ENABLED="true"
     export MST_ALERT_REPEAT_ENABLED="false"
@@ -146,7 +147,7 @@ mst_alert_evaluate true
 reset_alert_config
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|warn|CPU warning')"
 mst_alert_evaluate true
-[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
 [[ "$(event_count_by_transition NEW)" == "1" ]] || exit 1
 [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "1" ]] || exit 1
 event_id_first="$(first_event_field 1)"
@@ -154,21 +155,34 @@ mst_alert_evaluate true
 event_id_second="$(first_event_field 1)"
 [[ "${event_id_first}" == "${event_id_second}" ]] || exit 1
 [[ "$(event_count_by_transition UNCHANGED)" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+mst_alert_evaluate true
 [[ "${MST_ALERT_SUPPRESSED_EVENTS}" == "1" ]] || exit 1
 
 reset_alert_config
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 mst_alert_evaluate true
-[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
 [[ "$(event_count_by_transition NEW)" == "1" ]] || exit 1
+if mst_alert_has_confirmed_active_issue; then
+    exit 1
+fi
+mst_alert_evaluate true
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+mst_alert_has_confirmed_active_issue || exit 1
+
+reset_alert_config
+printf 'alert.health.res_health.cpu.cpu.cpu|health|res_health.cpu.cpu.cpu|critical|2026-07-18T00:00:00Z|2026-07-18T00:00:00Z|1|1784289600|true\n' > "${STATE_DIR}/alerts.state"
+mst_alert_has_confirmed_active_issue || exit 1
 
 reset_alert_config
 MST_BACKUP_REPORT_JSON="$(make_report backup 'res_backup.main|backup|main|unavailable|Backup unavailable')"
+mst_alert_evaluate true
 mst_alert_evaluate true
 [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
 
 reset_alert_config
 MST_SECURITY_REPORT_JSON="$(make_report security 'res_security.ssh|ssh|ssh|unknown|SSH unknown')"
+mst_alert_evaluate true
 mst_alert_evaluate true
 [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
 
@@ -183,6 +197,7 @@ reset_alert_config
 MST_ALERT_MODULES="backup"
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 MST_BACKUP_REPORT_JSON="$(make_report backup 'res_backup.main|backup|main|critical|Backup failed')"
+mst_alert_evaluate true
 mst_alert_evaluate true
 [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
 [[ "$(first_event_field 2)" == "backup" ]] || exit 1
@@ -208,6 +223,9 @@ MST_ALERT_REPEAT_INTERVAL_SECONDS="100"
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 mst_alert_evaluate true
 MST_ALERT_TEST_NOW_EPOCH="1784289650"
+mst_alert_evaluate true
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+MST_ALERT_TEST_NOW_EPOCH="1784289700"
 mst_alert_evaluate true
 [[ "$(event_count_by_transition UNCHANGED)" == "1" ]] || exit 1
 MST_ALERT_TEST_NOW_EPOCH="1784289801"
@@ -235,10 +253,12 @@ reset_alert_config
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 MST_BACKUP_REPORT_JSON="$(make_report backup 'res_backup.main|backup|main|warn|Backup warning')"
 mst_alert_evaluate true
+mst_alert_evaluate true
 [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "2" ]] || exit 1
 
 reset_alert_config
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed' '|bad|bad|critical|Missing result')"
+mst_alert_evaluate true
 mst_alert_evaluate true
 [[ "${MST_ALERT_TOTAL_EVENTS}" == "2" ]] || exit 1
 [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
@@ -267,7 +287,7 @@ ln -s "${STATE_DIR}/other.state" "${STATE_DIR}/alerts.state" 2>/dev/null || prin
 if [[ -L "${STATE_DIR}/alerts.state" ]]; then
     MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
     mst_alert_evaluate true
-    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
     [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "0" ]] || exit 1
     [[ "$(event_count_by_reason invalid_state_target)" == "1" ]] || exit 1
     [[ "$(event_count_by_reason state_persistence_unavailable)" == "1" ]] || exit 1
@@ -277,7 +297,7 @@ reset_alert_config
 mkdir "${STATE_DIR}/alerts.state"
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 mst_alert_evaluate true
-[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
 [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "0" ]] || exit 1
 [[ -d "${STATE_DIR}/alerts.state" ]] || exit 1
 [[ "$(event_count_by_reason invalid_state_target)" == "1" ]] || exit 1
@@ -288,7 +308,7 @@ mkfifo "${STATE_DIR}/alerts.state" 2>/dev/null || :
 if [[ -p "${STATE_DIR}/alerts.state" ]]; then
     MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
     mst_alert_evaluate true
-    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
     [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "0" ]] || exit 1
     [[ -p "${STATE_DIR}/alerts.state" ]] || exit 1
     [[ "$(event_count_by_reason invalid_state_target)" == "1" ]] || exit 1
@@ -299,7 +319,7 @@ reset_alert_config
 MST_ALERT_ATOMIC_WRITE_FAIL="true"
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
 mst_alert_evaluate true
-[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
 [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "1" ]] || exit 1
 [[ "$(event_count_by_reason state_write_failed)" == "1" ]] || exit 1
 
@@ -343,7 +363,7 @@ for mocked_kind in socket block_device character_device; do
     export MST_ALERT_MOCK_STATE_TARGET_KIND="${mocked_kind}"
     MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
     mst_alert_evaluate true
-    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+    [[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
     [[ "${MST_ALERT_ATOMIC_WRITE_CALLS}" == "0" ]] || exit 1
     [[ "${MST_ALERT_STATE_TARGET_KIND}" == "${mocked_kind}" ]] || exit 1
     [[ "$(event_count_by_reason invalid_state_target)" == "1" ]] || exit 1

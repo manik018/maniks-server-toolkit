@@ -54,6 +54,8 @@ MST_ALERT_ON_ERROR="true"
 MST_ALERT_ON_UNAVAILABLE="true"
 MST_ALERT_ON_UNKNOWN="true"
 MST_ALERT_MODULES="all"
+# Require repeated bad runs before the first alert delivery to avoid paging on a single transient failure.
+MST_ALERT_MIN_OCCURRENCES_BEFORE_DELIVERY="2"
 MST_ALERT_COOLDOWN_SECONDS="3600"
 MST_ALERT_RECOVERY_ENABLED="true"
 MST_ALERT_REPEAT_ENABLED="false"

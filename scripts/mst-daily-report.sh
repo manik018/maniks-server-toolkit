@@ -15,8 +15,9 @@ fi
 "${MST_BIN}" website >/dev/null 2>&1 || true
 "${MST_BIN}" wordpress >/dev/null 2>&1 || true
 "${MST_BIN}" backup >/dev/null 2>&1 || true
+"${MST_BIN}" alert >/dev/null 2>&1 || true
 
-report_output="$("${MST_BIN}" report --style auto 2>/dev/null)"
+report_output="$("${MST_BIN}" report --style digest 2>/dev/null)"
 
 if [[ -z "${report_output}" ]]; then
     printf 'MST unified report output is empty.\n' >&2
@@ -24,3 +25,20 @@ if [[ -z "${report_output}" ]]; then
 fi
 
 printf '%s\n' "${report_output}" | "${MST_BIN}" telegram
+telegram_status="${PIPESTATUS[1]}"
+if [[ "${telegram_status}" -ne 0 ]]; then
+    exit "${telegram_status}"
+fi
+
+if "${MST_BIN}" alert --has-confirmed-active-issue >/dev/null 2>&1; then
+    critical_output="$("${MST_BIN}" report --style critical 2>/dev/null)"
+    if [[ -z "${critical_output}" ]]; then
+        printf 'MST unified report output is empty.\n' >&2
+        exit 1
+    fi
+    printf '%s\n' "${critical_output}" | "${MST_BIN}" telegram
+    telegram_status="${PIPESTATUS[1]}"
+    if [[ "${telegram_status}" -ne 0 ]]; then
+        exit "${telegram_status}"
+    fi
+fi

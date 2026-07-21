@@ -266,7 +266,7 @@ mst_alert_prepare_state_target() {
 # Load alert state rows safely.
 mst_alert_load_state() {
     local state_file="${1:?state file required}"
-    local line field_count
+    local line field_count row_status row_delivered row_active row_confirmed
     declare -ga MST_ALERT_STATE_ROWS=()
     export MST_ALERT_STATE_MALFORMED="false"
 
@@ -275,7 +275,18 @@ mst_alert_load_state() {
     while IFS= read -r line || [[ -n "${line}" ]]; do
         [[ -n "${line}" ]] || continue
         field_count="$(awk -F'|' '{ print NF }' <<< "${line}")"
-        if [[ "${field_count}" -ne 9 ]]; then
+        if [[ "${field_count}" -eq 9 ]]; then
+            IFS='|' read -r _event _module _record row_status _first _last _occ row_delivered row_active <<< "${line}"
+            row_confirmed="false"
+            case "${row_status}" in
+                warn|critical|unavailable|unknown)
+                    if [[ "${row_active}" == "true" ]] && [[ "${row_delivered:-0}" =~ ^[0-9]+$ ]] && (( 10#${row_delivered} > 0 )); then
+                        row_confirmed="true"
+                    fi
+                    ;;
+            esac
+            line="${line}|${row_confirmed}"
+        elif [[ "${field_count}" -ne 10 ]]; then
             export MST_ALERT_STATE_MALFORMED="true"
             continue
         fi
@@ -288,7 +299,7 @@ mst_alert_state_row_for_event() {
     local event_id="${1:?event required}"
     local row row_event
     for row in "${MST_ALERT_STATE_ROWS[@]:-}"; do
-        IFS='|' read -r row_event _module _record _status _first _last _occ _delivered _active <<< "${row}"
+        IFS='|' read -r row_event _module _record _status _first _last _occ _delivered _active _confirmed <<< "${row}"
         [[ "${row_event}" == "${event_id}" ]] && {
             printf '%s' "${row}"
             return 0
@@ -304,7 +315,7 @@ mst_alert_state_upsert() {
     local row row_event updated=0 new_rows=()
 
     for row in "${MST_ALERT_STATE_ROWS[@]:-}"; do
-        IFS='|' read -r row_event _module _record _status _first _last _occ _delivered _active <<< "${row}"
+        IFS='|' read -r row_event _module _record _status _first _last _occ _delivered _active _confirmed <<< "${row}"
         if [[ "${row_event}" == "${event_id}" ]]; then
             new_rows+=("${new_row}")
             updated=1
@@ -365,14 +376,40 @@ mst_alert_status_is_active() {
     esac
 }
 
+# Return the configured number of consecutive occurrences required before first delivery.
+mst_alert_min_occurrences_before_delivery() {
+    local configured="${MST_ALERT_MIN_OCCURRENCES_BEFORE_DELIVERY:-2}"
+    [[ "${configured}" =~ ^[0-9]+$ ]] && (( 10#${configured} > 0 )) || configured="2"
+    printf '%s' "${configured}"
+}
+
+# Return success if persisted state has any confirmed active alert issue.
+mst_alert_has_confirmed_active_issue() {
+    local state_file row _event _module _record status _first _last _occ _delivered active_flag confirmed
+
+    declare -ga MST_ALERT_STATE_ROWS=()
+    state_file="$(mst_alert_state_file_path)" || return 1
+    mst_alert_prepare_state_target "${state_file}"
+    [[ "${MST_ALERT_STATE_PERSISTENCE_AVAILABLE:-false}" == "true" ]] || return 1
+    mst_alert_load_state "${state_file}"
+
+    for row in "${MST_ALERT_STATE_ROWS[@]:-}"; do
+        IFS='|' read -r _event _module _record status _first _last _occ _delivered active_flag confirmed <<< "${row}"
+        [[ "${active_flag}" == "true" ]] || continue
+        [[ "${confirmed}" == "true" ]] || continue
+        mst_alert_status_is_active "${status}" && return 0
+    done
+    return 1
+}
+
 # Evaluate one record against policy and prior state.
 mst_alert_evaluate_record() {
     local module_name="${1:?module required}"
     local record_object="${2:?record required}"
     local result_id check_name target_name record_module status summary record_key event_id
-    local previous_row previous_status="" first_seen="" previous_last_seen="" occurrence_count=0 last_delivered=0 active_flag="false"
+    local previous_row previous_status="" first_seen="" previous_last_seen="" occurrence_count=0 last_delivered=0 active_flag="false" confirmed="false"
     local now_epoch now_utc transition should_deliver="false" suppressed="false" suppression_reason="" recovery="false" alert_reason=""
-    local new_last_delivered state_active
+    local new_last_delivered state_active min_occurrences
 
     record_module="$(mst_alert_json_string_field "${record_object}" "module")"
     result_id="$(mst_alert_json_string_field "${record_object}" "result_id")"
@@ -393,21 +430,26 @@ mst_alert_evaluate_record() {
     event_id="$(mst_alert_event_id "${module_name}" "${record_key}")"
     now_epoch="$(mst_alert_now_epoch)"
     now_utc="$(mst_alert_now_utc)"
+    min_occurrences="$(mst_alert_min_occurrences_before_delivery)"
     previous_row="$(mst_alert_state_row_for_event "${event_id}" || true)"
     if [[ -n "${previous_row}" ]]; then
-        IFS='|' read -r _event _module _record previous_status first_seen previous_last_seen occurrence_count last_delivered active_flag <<< "${previous_row}"
+        IFS='|' read -r _event _module _record previous_status first_seen previous_last_seen occurrence_count last_delivered active_flag confirmed <<< "${previous_row}"
     fi
-    [[ -n "${first_seen}" ]] || first_seen="${now_utc}"
-    occurrence_count=$(( occurrence_count + 1 ))
     new_last_delivered="${last_delivered:-0}"
     state_active="false"
 
     if [[ "$(mst_alert_bool "${MST_ALERTS_ENABLED:-false}")" != "true" ]]; then
+        [[ -n "${first_seen}" ]] || first_seen="${now_utc}"
+        occurrence_count=$(( occurrence_count + 1 ))
+        confirmed="false"
         transition="SUPPRESSED"
         suppressed="true"
         suppression_reason="alerts_disabled"
         alert_reason="alerts_disabled"
     elif ! mst_alert_status_is_active "${status}"; then
+        [[ -n "${first_seen}" ]] || first_seen="${now_utc}"
+        occurrence_count=0
+        confirmed="false"
         if [[ "${active_flag}" == "true" ]] && mst_alert_status_is_active "${previous_status}"; then
             transition="RECOVERED"
             recovery="true"
@@ -426,30 +468,69 @@ mst_alert_evaluate_record() {
             alert_reason="healthy"
         fi
     elif ! mst_alert_policy_enabled_for_status "${status}"; then
+        if [[ "${active_flag}" == "true" ]] && mst_alert_status_is_active "${previous_status}"; then
+            occurrence_count=$(( occurrence_count + 1 ))
+        else
+            first_seen="${now_utc}"
+            occurrence_count=1
+        fi
+        confirmed="false"
         transition="SUPPRESSED"
         suppressed="true"
         suppression_reason="policy_disabled"
         alert_reason="policy_disabled"
         state_active="true"
     elif [[ "${active_flag}" != "true" ]] || [[ -z "${previous_status}" ]]; then
+        first_seen="${now_utc}"
+        occurrence_count=1
+        confirmed="false"
         transition="NEW"
-        should_deliver="true"
-        new_last_delivered="${now_epoch}"
+        if (( occurrence_count >= min_occurrences )); then
+            should_deliver="true"
+            confirmed="true"
+            new_last_delivered="${now_epoch}"
+        else
+            suppressed="true"
+            suppression_reason="confirmation_pending"
+        fi
         alert_reason="new_$(mst_alert_status_label "${status}")"
         state_active="true"
     elif [[ "${status}" != "${previous_status}" ]]; then
+        occurrence_count=$(( occurrence_count + 1 ))
         transition="CHANGED"
-        should_deliver="true"
-        new_last_delivered="${now_epoch}"
+        if [[ "${confirmed}" == "true" ]] || (( occurrence_count >= min_occurrences )); then
+            should_deliver="true"
+            confirmed="true"
+            new_last_delivered="${now_epoch}"
+        else
+            suppressed="true"
+            suppression_reason="confirmation_pending"
+        fi
         alert_reason="status_changed"
         state_active="true"
+    elif [[ "${confirmed}" != "true" ]]; then
+        occurrence_count=$(( occurrence_count + 1 ))
+        transition="UNCHANGED"
+        if (( occurrence_count >= min_occurrences )); then
+            should_deliver="true"
+            confirmed="true"
+            new_last_delivered="${now_epoch}"
+            alert_reason="confirmation_threshold_met"
+        else
+            suppressed="true"
+            suppression_reason="confirmation_pending"
+            alert_reason="duplicate_active_event"
+        fi
+        state_active="true"
     elif [[ "$(mst_alert_bool "${MST_ALERT_REPEAT_ENABLED:-false}")" == "true" ]] && (( now_epoch - last_delivered >= MST_ALERT_REPEAT_INTERVAL_SECONDS )); then
+        occurrence_count=$(( occurrence_count + 1 ))
         transition="REPEATED"
         should_deliver="true"
         new_last_delivered="${now_epoch}"
         alert_reason="repeat_interval_elapsed"
         state_active="true"
     else
+        occurrence_count=$(( occurrence_count + 1 ))
         transition="UNCHANGED"
         suppressed="true"
         if (( now_epoch - last_delivered < MST_ALERT_COOLDOWN_SECONDS )); then
@@ -462,7 +543,7 @@ mst_alert_evaluate_record() {
     fi
 
     mst_alert_add_event "${event_id}" "${module_name}" "${record_key}" "${status}" "${previous_status}" "${transition}" "${first_seen}" "${now_utc}" "${occurrence_count}" "${alert_reason}" "${summary:-Alert status evaluated.}" "${should_deliver}" "${suppressed}" "${suppression_reason}" "${recovery}"
-    mst_alert_state_upsert "${event_id}|${module_name}|${record_key}|${status}|${first_seen}|${now_utc}|${occurrence_count}|${new_last_delivered}|${state_active}"
+    mst_alert_state_upsert "${event_id}|${module_name}|${record_key}|${status}|${first_seen}|${now_utc}|${occurrence_count}|${new_last_delivered}|${state_active}|${confirmed}"
 }
 
 # Evaluate all configured MRRF1 inputs.

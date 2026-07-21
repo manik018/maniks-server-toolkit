@@ -17,14 +17,21 @@ cat > "${STUB_BIN}" <<'EOF'
 set -euo pipefail
 
 subcommand="${1:-}"
-printf '%s\n' "${subcommand}" >> "${MST_DAILY_LOG_FILE:?log file required}"
+printf '%s\n' "$*" >> "${MST_DAILY_LOG_FILE:?log file required}"
 
 case "${subcommand}" in
     health|services|security|website|wordpress|backup)
         exit 7
         ;;
     report)
-        printf 'REPORT BODY\n'
+        [[ "${2:-}" == "--style" && "${3:-}" == "digest" ]] || exit 98
+        printf 'DIGEST BODY\n'
+        exit 7
+        ;;
+    alert)
+        if [[ "${2:-}" == "--has-confirmed-active-issue" ]]; then
+            exit 1
+        fi
         exit 7
         ;;
     telegram)
@@ -52,7 +59,7 @@ set -e
     exit 1
 }
 
-expected_order=$'health\nservices\nsecurity\nwebsite\nwordpress\nbackup\nreport\ntelegram'
+expected_order=$'health\nservices\nsecurity\nwebsite\nwordpress\nbackup\nalert\nreport --style digest\ntelegram'
 actual_order="$(cat "${LOG_FILE}")"
 [[ "${actual_order}" == "${expected_order}" ]] || {
     printf 'unexpected command order:\n%s\n' "${actual_order}" >&2
@@ -60,7 +67,7 @@ actual_order="$(cat "${LOG_FILE}")"
 }
 
 actual_telegram_stdin="$(cat "${TELEGRAM_STDIN_FILE}")"
-[[ "${actual_telegram_stdin}" == "REPORT BODY" ]] || {
+[[ "${actual_telegram_stdin}" == "DIGEST BODY" ]] || {
     printf 'unexpected telegram stdin: %s\n' "${actual_telegram_stdin}" >&2
     exit 1
 }

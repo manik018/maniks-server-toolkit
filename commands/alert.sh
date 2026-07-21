@@ -12,6 +12,7 @@ fi
 # Evaluate existing MRRF1 reports into alert decisions.
 mst_command_alert_execute() {
     local update_state="true"
+    local confirmed_check="false"
     local args=()
 
     if [[ "${MST_OUTPUT_MODE}" != "text" ]]; then
@@ -20,6 +21,9 @@ mst_command_alert_execute() {
 
     while (($# > 0)); do
         case "${1}" in
+            --has-confirmed-active-issue)
+                confirmed_check="true"
+                ;;
             --no-state)
                 update_state="false"
                 ;;
@@ -32,6 +36,12 @@ mst_command_alert_execute() {
         esac
         shift || true
     done
+
+    if [[ "${confirmed_check}" == "true" ]]; then
+        [[ "${#args[@]}" -eq 0 ]] || mst_die "${MST_EXIT_USAGE}" "Confirmed alert check does not accept report inputs"
+        mst_alert_has_confirmed_active_issue
+        return $?
+    fi
 
     mst_alert_evaluate "${update_state}" "${args[@]}"
     mst_render_alert_report_text
