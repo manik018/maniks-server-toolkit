@@ -11,7 +11,7 @@ cleanup_test_workspace() {
 }
 trap cleanup_test_workspace EXIT INT TERM
 rm -rf -- "${TMP_DIR}"
-mkdir -p "${STATE_DIR}"
+mkdir -p "${STATE_DIR}" "${STATE_DIR}/reports"
 
 # shellcheck source=lib/bootstrap.sh
 source "${ROOT_DIR}/lib/bootstrap.sh"
@@ -29,7 +29,7 @@ mst_fs_validate_runtime_file_path() {
 
 mst_fs_validate_runtime_directory() {
     local path="${1:?path required}"
-    [[ "${path}" == "${STATE_DIR}" ]] || return 1
+    [[ "${path}" == "${STATE_DIR}" || "${path}" == "${STATE_DIR}"/* ]] || return 1
     [[ -d "${path}" ]] || return 1
     [[ ! -L "${path}" ]] || return 1
     printf '%s' "${path}"
@@ -51,6 +51,8 @@ mst_fs_atomic_write() {
 
 cleanup_alert_state_path() {
     rm -rf "${STATE_DIR}/alerts.state" "${STATE_DIR}/alerts.state".tmp.*
+    rm -rf "${STATE_DIR}/reports"
+    mkdir -p "${STATE_DIR}/reports"
 }
 
 reset_alert_config() {
@@ -131,6 +133,16 @@ event_count_by_reason() {
     printf '%s' "${count}"
 }
 
+event_count_by_module() {
+    local wanted="${1:?module required}"
+    local row module_name count=0
+    for row in "${MST_ALERT_EVENTS[@]:-}"; do
+        module_name="$(awk -v sep="${MST_MRRF_FIELD_SEPARATOR}" 'BEGIN { FS=sep } { print $2 }' <<< "${row}")"
+        [[ "${module_name}" == "${wanted}" ]] && count=$(( count + 1 ))
+    done
+    printf '%s' "${count}"
+}
+
 reset_alert_config
 MST_ALERTS_ENABLED="false"
 MST_HEALTH_REPORT_JSON="$(make_report health 'res_health.cpu|cpu|cpu|critical|CPU failed')"
@@ -173,6 +185,27 @@ mst_alert_has_confirmed_active_issue || exit 1
 reset_alert_config
 printf 'alert.health.res_health.cpu.cpu.cpu|health|res_health.cpu.cpu.cpu|critical|2026-07-18T00:00:00Z|2026-07-18T00:00:00Z|1|1784289600|true\n' > "${STATE_DIR}/alerts.state"
 mst_alert_has_confirmed_active_issue || exit 1
+
+reset_alert_config
+mst_state_save_report website "$(make_report website 'res_website.site|http|example.test|critical|Website failed')"
+mst_alert_evaluate true
+[[ "$(event_count_by_module website)" == "1" ]] || exit 1
+[[ "$(event_count_by_transition NEW)" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
+mst_alert_evaluate true
+[[ "$(event_count_by_module website)" == "1" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "1" ]] || exit 1
+mst_alert_has_confirmed_active_issue || exit 1
+
+reset_alert_config
+persisted_website_report="$(make_report website 'res_website.site|http|example.test|critical|Persisted website failed')"
+argument_website_report="${TMP_DIR}/website-argument.mrrf1.json"
+mst_state_save_report website "${persisted_website_report}"
+printf '%s\n' "$(make_report website 'res_website.site|http|example.test|ok|Argument website healthy')" > "${argument_website_report}"
+mst_alert_evaluate true "website=${argument_website_report}"
+[[ "$(event_count_by_module website)" == "1" ]] || exit 1
+[[ "$(first_event_field 4)" == "ok" ]] || exit 1
+[[ "${MST_ALERT_DELIVERABLE_EVENTS}" == "0" ]] || exit 1
 
 reset_alert_config
 MST_BACKUP_REPORT_JSON="$(make_report backup 'res_backup.main|backup|main|unavailable|Backup unavailable')"

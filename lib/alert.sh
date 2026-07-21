@@ -158,6 +158,17 @@ mst_alert_json_for_env() {
     printf '%s' "${json_ref:-}"
 }
 
+# Load persisted aggregate reports for every alert module when no in-process value exists.
+mst_alert_load_persisted_reports() {
+    local key env_name
+
+    while IFS='|' read -r key env_name; do
+        if [[ -z "$(mst_alert_json_for_env "${env_name}")" ]]; then
+            mst_state_load_report "${key}" "${env_name}" || true
+        fi
+    done < <(mst_alert_module_catalog)
+}
+
 # Validate the outer MRRF1 report shape.
 mst_alert_validate_mrrf_report() {
     local module_name="${1:?module required}"
@@ -571,9 +582,7 @@ mst_alert_evaluate() {
     fi
 
     mst_alert_load_argument_reports "$@"
-    if [[ -z "${MST_HEALTH_REPORT_JSON:-}" ]]; then
-        mst_state_load_report health MST_HEALTH_REPORT_JSON || true
-    fi
+    mst_alert_load_persisted_reports
 
     while IFS='|' read -r key env_name; do
         mst_alert_module_enabled "${key}" || continue
