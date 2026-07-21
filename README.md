@@ -48,6 +48,8 @@ All monitoring commands except `mst health`, `mst services`, `mst security`, `ms
 - Telegram Module v1 for delivering pre-rendered text through the Telegram Bot API
 - Alert Engine v1 for policy-only alert decisions from existing MRRF1 aggregate reports
 
+See [Telegram Setup](docs/telegram-setup.md) for step-by-step Telegram bot setup.
+
 ## Architecture
 
 - [Architecture Design Document](docs/architecture-design-document.md)
