@@ -121,6 +121,9 @@ mst_wordpress_wp_cli_capture() {
     if [[ -n "${document_root}" ]]; then
         cmd+=( "--path=${document_root}" )
     fi
+    if [[ "${EUID}" -eq 0 ]]; then
+        cmd+=( "--allow-root" )
+    fi
     cmd+=( "--url=${site_url}" "$@" )
     mst_exec_capture_stdout "${timeout_seconds}" "${cmd[@]}"
 }
@@ -136,6 +139,9 @@ mst_wordpress_wp_cli_run() {
 
     if [[ -n "${document_root}" ]]; then
         cmd+=( "--path=${document_root}" )
+    fi
+    if [[ "${EUID}" -eq 0 ]]; then
+        cmd+=( "--allow-root" )
     fi
     cmd+=( "--url=${site_url}" "$@" )
     timeout "${timeout_seconds}" "${cmd[@]}" >/dev/null 2>&1

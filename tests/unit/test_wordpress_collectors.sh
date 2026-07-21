@@ -25,6 +25,56 @@ source "${ROOT_DIR}/inspectors/wordpress.sh"
 
 export MST_WORDPRESS_CRON_OVERDUE_WARN_COUNT="0"
 
+WP_BIN_DIR="${TMP_DIR}/bin"
+WP_ARG_LOG="${TMP_DIR}/wp-args.log"
+mkdir -p "${WP_BIN_DIR}"
+cat > "${WP_BIN_DIR}/wp" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' "$*" >> "${MST_TEST_WP_ARG_LOG:?arg log required}"
+for arg in "$@"; do
+    if [[ "${arg}" == "--allow-root" ]]; then
+        exit 0
+    fi
+done
+if [[ "${MST_TEST_EXPECT_ALLOW_ROOT:-0}" -eq 1 ]]; then
+    exit 1
+fi
+exit 0
+EOF
+chmod 0755 "${WP_BIN_DIR}/wp"
+
+ORIGINAL_PATH="${PATH}"
+PATH="${WP_BIN_DIR}:${PATH}"
+export PATH MST_TEST_WP_ARG_LOG="${WP_ARG_LOG}"
+: > "${WP_ARG_LOG}"
+if [[ "${EUID}" -eq 0 ]]; then
+    export MST_TEST_EXPECT_ALLOW_ROOT=1
+    mst_wordpress_wp_cli_run "wp" "${SITE_DIR}" "https://example.test" "5" core is-installed || {
+        printf 'wp-cli run should pass --allow-root when invoked as root.\n' >&2
+        exit 1
+    }
+    mst_wordpress_wp_cli_capture "wp" "${SITE_DIR}" "https://example.test" "5" core version >/dev/null || {
+        printf 'wp-cli capture should pass --allow-root when invoked as root.\n' >&2
+        exit 1
+    }
+    grep -q -- '--allow-root' "${WP_ARG_LOG}" || {
+        printf 'wp-cli invocation did not include --allow-root for root execution.\n' >&2
+        exit 1
+    }
+else
+    export MST_TEST_EXPECT_ALLOW_ROOT=0
+    mst_wordpress_wp_cli_run "wp" "${SITE_DIR}" "https://example.test" "5" core is-installed || exit 1
+    if grep -q -- '--allow-root' "${WP_ARG_LOG}"; then
+        printf 'wp-cli invocation should not include --allow-root for non-root execution.\n' >&2
+        exit 1
+    fi
+fi
+PATH="${ORIGINAL_PATH}"
+export PATH
+unset MST_TEST_EXPECT_ALLOW_ROOT
+
 mst_wordpress_detect_hostname() {
     printf 'wordpress-test'
 }
