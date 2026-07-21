@@ -155,18 +155,20 @@ mst_backup_rclone_remote_configured() {
 # Run rclone lsjson for one remote target.
 mst_backup_rclone_lsjson() {
     local location="${1:?location required}"
-    mst_exec_capture_stdout "${MST_BACKUP_TIMEOUT_SECONDS}" rclone lsjson --max-depth 1 "${location}"
+    mst_exec_capture_stdout "${MST_BACKUP_TIMEOUT_SECONDS}" rclone lsjson --recursive "${location}"
 }
 
 # Return name|size|modtime for the latest object in one lsjson payload.
 mst_backup_rclone_latest_object() {
     local json_payload="${1:-}"
     local compact payload object best_name="" best_size="" best_modtime="" best_epoch=-1
-    local name size modtime epoch
+    local name size modtime is_dir epoch
 
     compact="$(printf '%s' "${json_payload}" | tr -d '\n' | sed 's/^[[:space:]]*\[//; s/\][[:space:]]*$//; s/},{/}\n{/g')"
     while IFS= read -r object || [[ -n "${object}" ]]; do
         [[ -n "${object}" ]] || continue
+        is_dir="$(printf '%s' "${object}" | sed -n 's/.*"IsDir"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p')"
+        [[ "${is_dir}" == "true" ]] && continue
         name="$(printf '%s' "${object}" | sed -n 's/.*"Name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
         [[ -n "${name}" ]] || name="$(printf '%s' "${object}" | sed -n 's/.*"Path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
         size="$(printf '%s' "${object}" | sed -n 's/.*"Size"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')"

@@ -81,6 +81,18 @@ mst_backup_rclone_remote_configured() {
     [[ "${1}" == "remote" ]]
 }
 
+nested_remote_payload='[
+{"Path":"2026-07-21","Name":"2026-07-21","IsDir":true,"ModTime":"2026-07-21T10:00:00Z"},
+{"Path":"2026-07-21/03.00","Name":"03.00","IsDir":true,"ModTime":"2026-07-21T10:05:00Z"},
+{"Path":"2026-07-20/02.00/home/site/backup.tar","Name":"backup.tar","Size":20971520,"IsDir":false,"ModTime":"2026-07-20T02:30:00Z"},
+{"Path":"cloudpanel-backup.tar.gz","Name":"cloudpanel-backup.tar.gz","Size":10485760,"IsDir":false,"ModTime":"2026-07-19T23:00:00Z"},
+{"Path":"2026-07-21/03.00/home/site/backup.tar","Name":"backup.tar","Size":31457280,"IsDir":false,"ModTime":"2026-07-21T03:30:00Z"}
+]'
+IFS='|' read -r latest_remote_name latest_remote_size latest_remote_modtime <<< "$(mst_backup_rclone_latest_object "${nested_remote_payload}")"
+[[ "${latest_remote_name}" == "backup.tar" ]] || exit 1
+[[ "${latest_remote_size}" == "31457280" ]] || exit 1
+[[ "${latest_remote_modtime}" == "2026-07-21T03:30:00Z" ]] || exit 1
+
 mst_backup_rclone_lsjson() {
     case "${1}" in
         remote:bucket)
