@@ -3,7 +3,7 @@
 
 readonly MST_APP_NAME="Manik's Server Toolkit"
 readonly MST_PROGRAM_NAME="mst"
-readonly MST_VERSION="1.0.5"
+readonly MST_VERSION="1.0.6"
 readonly MST_SUPPORTED_CONFIG_SCHEMA_VERSION="1"
 readonly MST_DEFAULT_TIMEOUT_SECONDS="10"
 readonly MST_LOCK_SCHEMA_VERSION="1"
