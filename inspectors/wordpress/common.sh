@@ -248,6 +248,30 @@ mst_wordpress_theme_info() {
     printf '%s|%s' "${active_theme}" "${updates}"
 }
 
+# Count cron events whose next_run_gmt timestamp is due now or overdue.
+mst_wordpress_overdue_cron_events_count() {
+    local csv_payload="${1:-}"
+    local line timestamp epoch now_epoch count=0 first_line=1
+
+    now_epoch="$(date -u '+%s')"
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        line="${line%$'\r'}"
+        timestamp="$(mst_wordpress_trim "${line}")"
+        if (( first_line == 1 )); then
+            first_line=0
+            [[ "${timestamp}" == "next_run_gmt" ]] && continue
+        fi
+        [[ -n "${timestamp}" ]] || continue
+        epoch="$(date -u -d "${timestamp}" '+%s' 2>/dev/null || true)"
+        [[ -n "${epoch}" ]] || continue
+        if (( epoch <= now_epoch )); then
+            count=$(( count + 1 ))
+        fi
+    done <<< "${csv_payload}"
+
+    printf '%s' "${count}"
+}
+
 # Return the REST API endpoint for one site URL.
 mst_wordpress_rest_url() {
     local site_url="${1:?site url required}"
@@ -599,7 +623,7 @@ mst_wordpress_collect_site() {
                 severity="warning"
             fi
 
-            overdue_events="$(mst_wordpress_parse_count "$(mst_wordpress_wp_cli_capture "${wp_cli_path}" "${document_root}" "${site_url}" "${MST_WORDPRESS_TIMEOUT_SECONDS}" cron event list --due-now --format=count 2>/dev/null || printf '0')")"
+            overdue_events="$(mst_wordpress_overdue_cron_events_count "$(mst_wordpress_wp_cli_capture "${wp_cli_path}" "${document_root}" "${site_url}" "${MST_WORDPRESS_TIMEOUT_SECONDS}" cron event list --fields=next_run_gmt --format=csv 2>/dev/null || true)")"
             if (( overdue_events > 10#${MST_WORDPRESS_CRON_OVERDUE_WARN_COUNT} )) && [[ "${status}" == "ok" ]]; then
                 status="warn"
                 severity="warning"

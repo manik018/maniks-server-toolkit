@@ -141,21 +141,21 @@ mst_wordpress_wp_cli_capture() {
         "https://example.test|core check-update --format=count") printf '0\n' ;;
         "https://example.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\nseo,inactive,none\n' ;;
         "https://example.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
-        "https://example.test|cron event list --due-now --format=count") printf '0\n' ;;
+        "https://example.test|cron event list --fields=next_run_gmt --format=csv") printf 'next_run_gmt\n2099-01-01 00:00:00\n' ;;
         "https://example.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://rest-down.test|core version") printf '6.6.0\n' ;;
         "https://rest-down.test|core check-update --format=count") printf '0\n' ;;
         "https://rest-down.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\n' ;;
         "https://rest-down.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
-        "https://rest-down.test|cron event list --due-now --format=count") printf '0\n' ;;
+        "https://rest-down.test|cron event list --fields=next_run_gmt --format=csv") printf 'next_run_gmt\n2099-01-01 00:00:00\n' ;;
         "https://rest-down.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://db-fail.test|core version") printf '6.6.0\n' ;;
         "https://db-fail.test|core check-update --format=count") printf '0\n' ;;
         "https://db-fail.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\n' ;;
         "https://db-fail.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
-        "https://db-fail.test|cron event list --due-now --format=count") printf '0\n' ;;
+        "https://db-fail.test|cron event list --fields=next_run_gmt --format=csv") printf 'next_run_gmt\n2099-01-01 00:00:00\n' ;;
         "https://db-fail.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
 
         "https://missing.test|core version") printf '' ;;
@@ -163,8 +163,14 @@ mst_wordpress_wp_cli_capture() {
         "https://updates.test|core check-update --format=count") printf '1\n' ;;
         "https://updates.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,available\nseo,inactive,none\n' ;;
         "https://updates.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,available\n' ;;
-        "https://updates.test|cron event list --due-now --format=count") printf '3\n' ;;
+        "https://updates.test|cron event list --fields=next_run_gmt --format=csv") printf 'next_run_gmt\n2020-01-01 00:00:00\n2020-01-02 00:00:00\n2020-01-03 00:00:00\n2099-01-01 00:00:00\n' ;;
         "https://updates.test|maintenance-mode status") printf 'Maintenance mode is active.\n' ;;
+        "https://cron-mixed.test|core version") printf '6.6.0\n' ;;
+        "https://cron-mixed.test|core check-update --format=count") printf '0\n' ;;
+        "https://cron-mixed.test|plugin list --fields=name,status,update --format=csv") printf 'name,status,update\nakismet,active,none\n' ;;
+        "https://cron-mixed.test|theme list --fields=name,status,update --format=csv") printf 'name,status,update\ntwentytwentyfour,active,none\n' ;;
+        "https://cron-mixed.test|cron event list --fields=next_run_gmt --format=csv") printf 'next_run_gmt\n2020-01-01 00:00:00\n2099-01-01 00:00:00\n2020-01-02 12:30:00\n2099-06-01 09:15:00\nnot-a-date\n' ;;
+        "https://cron-mixed.test|maintenance-mode status") printf 'Maintenance mode is not active.\n' ;;
         *)
             return 1
             ;;
@@ -193,8 +199,24 @@ mst_wordpress_wp_cli_run() {
         "https://missing.test|core is-installed") return 1 ;;
         "https://updates.test|core is-installed") return 0 ;;
         "https://updates.test|db check --quiet") return 0 ;;
+        "https://cron-mixed.test|core is-installed") return 0 ;;
+        "https://cron-mixed.test|db check --quiet") return 0 ;;
         *) return 1 ;;
     esac
+}
+
+wordpress_detail_value() {
+    local wanted="${1:?detail key required}"
+    local detail key _label _type value _unit _redacted
+    shift || true
+    for detail in "$@"; do
+        IFS="${MST_MRRF_FIELD_SEPARATOR}" read -r key _label _type value _unit _redacted <<< "${detail}"
+        if [[ "${key}" == "${wanted}" ]]; then
+            printf '%s' "${value}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 declare -A ok_record=()
@@ -262,5 +284,11 @@ cat > "${SITE_DIR}/wp-config.php" <<'EOF'
 define( 'WP_DEBUG', false );
 define( 'DISABLE_WP_CRON', false );
 EOF
+
+declare -A cron_mixed_record=()
+declare -a cron_mixed_details=() cron_mixed_errors=() cron_mixed_rows=()
+mst_wordpress_collect_site 7 "Cron Mixed WP" "https://cron-mixed.test" "${SITE_DIR}" "${SITE_DIR}/wp-config.php" "wp" "true" cron_mixed_record cron_mixed_details cron_mixed_errors cron_mixed_rows
+[[ "$(wordpress_detail_value overdue_scheduled_events "${cron_mixed_details[@]}")" == "2" ]] || exit 1
+[[ "${cron_mixed_record[status]}" == "warn" ]] || exit 1
 
 printf 'test_wordpress_collectors.sh passed.\n'
