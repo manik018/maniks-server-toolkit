@@ -41,18 +41,20 @@ export MST_SECURITY_REPORT_JSON
 export MST_WEBSITE_REPORT_JSON
 export MST_WORDPRESS_REPORT_JSON
 export MST_BACKUP_REPORT_JSON
+export MST_SECURITY_EVENTS_REPORT_JSON
 
 MST_HEALTH_REPORT_JSON="$(make_report health ok 'cpu|ok|CPU healthy' 'memory|ok|Memory healthy')"
 MST_SERVICES_REPORT_JSON="$(make_report services ok 'nginx|ok|nginx active')"
 MST_SECURITY_REPORT_JSON="$(make_report security warn 'ssh|warn|Password auth enabled')"
+MST_SECURITY_EVENTS_REPORT_JSON="$(make_report security_events ok 'security_events|ok|Security events enabled')"
 MST_WEBSITE_REPORT_JSON="$(make_report website critical 'site|critical|Homepage failed')"
 MST_WORDPRESS_REPORT_JSON="$(make_report wordpress unavailable 'wp|unavailable|WP-CLI unavailable')"
 MST_BACKUP_REPORT_JSON="$(make_report backup unknown 'backup|unknown|Backup state unknown')"
 
 mst_report_collect
-[[ "${MST_REPORT_TOTAL_MODULES}" == "6" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_RECORDS}" == "7" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_OK}" == "3" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_MODULES}" == "7" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_RECORDS}" == "8" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_OK}" == "4" ]] || exit 1
 [[ "${MST_REPORT_TOTAL_WARN}" == "1" ]] || exit 1
 [[ "${MST_REPORT_TOTAL_CRITICAL}" == "1" ]] || exit 1
 [[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "1" ]] || exit 1
@@ -73,34 +75,36 @@ fi
 unset MST_BACKUP_REPORT_JSON
 mst_report_collect
 [[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "2" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_RECORDS}" == "7" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_RECORDS}" == "8" ]] || exit 1
 
-unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
+unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_SECURITY_EVENTS_REPORT_JSON MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
 mst_report_collect
-[[ "${MST_REPORT_TOTAL_MODULES}" == "6" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_RECORDS}" == "6" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "6" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_MODULES}" == "7" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_RECORDS}" == "7" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "7" ]] || exit 1
 [[ "${MST_REPORT_STATUS}" == "unavailable" ]] || exit 1
 
 MST_HEALTH_REPORT_JSON="$(make_report health ok 'cpu|ok|CPU healthy')"
 MST_SERVICES_REPORT_JSON="$(make_report services ok 'nginx|ok|nginx active')"
 MST_SECURITY_REPORT_JSON="$(make_report security ok 'ssh|ok|SSH healthy')"
+MST_SECURITY_EVENTS_REPORT_JSON="$(make_report security_events ok 'security_events|ok|Security events enabled')"
 MST_WEBSITE_REPORT_JSON="$(make_report website ok 'site|ok|Homepage healthy')"
 MST_WORDPRESS_REPORT_JSON="$(make_report wordpress ok 'wp|ok|WordPress healthy')"
 MST_BACKUP_REPORT_JSON="$(make_report backup ok 'backup|ok|Backup fresh')"
 mst_report_collect
 [[ "${MST_REPORT_STATUS}" == "ok" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_OK}" == "6" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_OK}" == "7" ]] || exit 1
 
 MST_HEALTH_REPORT_JSON="$(make_report health critical 'cpu|critical|CPU failed')"
 MST_SERVICES_REPORT_JSON="$(make_report services critical 'nginx|critical|nginx failed')"
 MST_SECURITY_REPORT_JSON="$(make_report security critical 'ssh|critical|SSH failed')"
+MST_SECURITY_EVENTS_REPORT_JSON="$(make_report security_events critical 'security_events|critical|Security events failed')"
 MST_WEBSITE_REPORT_JSON="$(make_report website critical 'site|critical|Homepage failed')"
 MST_WORDPRESS_REPORT_JSON="$(make_report wordpress critical 'wp|critical|WordPress failed')"
 MST_BACKUP_REPORT_JSON="$(make_report backup critical 'backup|critical|Backup failed')"
 mst_report_collect
 [[ "${MST_REPORT_STATUS}" == "critical" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_CRITICAL}" == "6" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_CRITICAL}" == "7" ]] || exit 1
 
 MST_HEALTH_REPORT_JSON='{"schema_version":1,"document_type":"record"}'
 mst_report_collect

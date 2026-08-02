@@ -62,10 +62,11 @@ set_ok_fixture() {
         "$(make_record health uptime uptime localhost ok 'System uptime is 1h 1m since 2026-07-17T00:00:00Z.' "${uptime_details}")")"
     MST_SERVICES_REPORT_JSON="$(make_report_from_records services ok "$(make_record services nginx service_status Nginx ok 'Nginx active.' '[]')")"
     MST_SECURITY_REPORT_JSON="$(make_report_from_records security ok "$(make_record security ssh ssh_config SSH ok 'SSH healthy.' '[]')")"
+    MST_SECURITY_EVENTS_REPORT_JSON="$(make_report_from_records security_events ok "$(make_record security_events module module_status security_events ok 'Security events enabled.' '[]')")"
     MST_WEBSITE_REPORT_JSON="$(make_report_from_records website ok "$(make_record website site http_check example.com ok 'Homepage healthy.' '[]')")"
     MST_WORDPRESS_REPORT_JSON="$(make_report_from_records wordpress ok "$(make_record wordpress wp wp_cli example.com ok 'WordPress healthy.' '[]')")"
     MST_BACKUP_REPORT_JSON="$(make_report_from_records backup ok "$(make_record backup local backup_age local ok 'Backup fresh.' '[]')")"
-    export MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
+    export MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_SECURITY_EVENTS_REPORT_JSON MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
 }
 
 set_critical_fixture() {

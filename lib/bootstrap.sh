@@ -81,6 +81,7 @@ doctor|doctor|implemented
 health|health|implemented
 services|services|implemented
 security|security|implemented
+security_events|security_events|implemented
 website|website|implemented
 wordpress|wordpress|implemented
 backup|backup|implemented
@@ -245,7 +246,7 @@ mst_dispatch() {
     mst_runtime_init
     mst_apply_global_cli_options
     mst_output_init
-    if [[ "${MST_COMMAND_ID}" == "doctor" ]] || [[ "${MST_COMMAND_ID}" == "health" ]] || [[ "${MST_COMMAND_ID}" == "services" ]] || [[ "${MST_COMMAND_ID}" == "security" ]] || [[ "${MST_COMMAND_ID}" == "website" ]] || [[ "${MST_COMMAND_ID}" == "wordpress" ]] || [[ "${MST_COMMAND_ID}" == "backup" ]] || [[ "${MST_COMMAND_ID}" == "telegram" ]] || [[ "${MST_COMMAND_ID}" == "alert" ]]; then
+    if [[ "${MST_COMMAND_ID}" == "doctor" ]] || [[ "${MST_COMMAND_ID}" == "health" ]] || [[ "${MST_COMMAND_ID}" == "services" ]] || [[ "${MST_COMMAND_ID}" == "security" ]] || [[ "${MST_COMMAND_ID}" == "security_events" ]] || [[ "${MST_COMMAND_ID}" == "website" ]] || [[ "${MST_COMMAND_ID}" == "wordpress" ]] || [[ "${MST_COMMAND_ID}" == "backup" ]] || [[ "${MST_COMMAND_ID}" == "telegram" ]] || [[ "${MST_COMMAND_ID}" == "alert" ]]; then
         mst_config_load
     fi
     mst_logging_init

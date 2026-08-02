@@ -12,6 +12,7 @@ mst_report_module_catalog() {
 health|Health|MST_HEALTH_REPORT_JSON
 services|Services|MST_SERVICES_REPORT_JSON
 security|Security|MST_SECURITY_REPORT_JSON
+security_events|Security Events|MST_SECURITY_EVENTS_REPORT_JSON
 website|Websites|MST_WEBSITE_REPORT_JSON
 wordpress|WordPress|MST_WORDPRESS_REPORT_JSON
 backup|Backups|MST_BACKUP_REPORT_JSON

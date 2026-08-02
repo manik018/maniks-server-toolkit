@@ -29,6 +29,8 @@ MST_SECURITY_UFW_DEFAULTS_FILE="/etc/default/ufw"
 MST_SECURITY_FAIL2BAN_SERVICE_CANDIDATES="fail2ban.service"
 MST_SECURITY_AUTO_UPGRADES_FILE="/etc/apt/apt.conf.d/20auto-upgrades"
 MST_SECURITY_TIMESYNC_SERVICE_CANDIDATES="systemd-timesyncd.service,chrony.service,chronyd.service,ntp.service"
+# Enable the advanced security events monitoring module.
+MST_SECURITY_EVENTS_ENABLED="true"
 MST_WEBSITE_TARGETS=""
 # Set to "yes" to read-only discover sites from local nginx/apache configuration.
 MST_WEBSITE_AUTO_DISCOVER="no"

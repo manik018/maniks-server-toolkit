@@ -36,6 +36,13 @@ mst_log() {
     return 0
 }
 
+mst_command_run_with_lock() {
+    local _lock_name="${1:?lock name required}"
+    local command_fn="${2:?command function required}"
+    shift 2
+    "${command_fn}" "$@"
+}
+
 make_report() {
     local command_name="${1:?command required}"
     local target_name="${2:?target required}"
@@ -54,6 +61,8 @@ make_report() {
 source "${ROOT_DIR}/commands/services.sh"
 # shellcheck source=commands/security.sh
 source "${ROOT_DIR}/commands/security.sh"
+# shellcheck source=commands/security_events.sh
+source "${ROOT_DIR}/commands/security_events.sh"
 # shellcheck source=commands/website.sh
 source "${ROOT_DIR}/commands/website.sh"
 # shellcheck source=commands/wordpress.sh
@@ -71,6 +80,12 @@ mst_security_collect_report() {
     MST_SECURITY_REPORT_JSON="$(make_report security ssh "Persisted security report")"
     MST_SECURITY_REPORT_EXIT_CODE=0
     export MST_SECURITY_REPORT_JSON MST_SECURITY_REPORT_EXIT_CODE
+}
+
+mst_security_events_collect_report() {
+    MST_SECURITY_EVENTS_REPORT_JSON="$(make_report security_events module_status "Persisted security events report")"
+    MST_SECURITY_EVENTS_REPORT_EXIT_CODE=0
+    export MST_SECURITY_EVENTS_REPORT_JSON MST_SECURITY_EVENTS_REPORT_EXIT_CODE
 }
 
 mst_website_collect_report() {
@@ -93,17 +108,19 @@ mst_backup_collect_report() {
 
 mst_render_services_report_text() { return 0; }
 mst_render_security_report_text() { return 0; }
+mst_render_security_events_report_text() { return 0; }
 mst_render_website_report_text() { return 0; }
 mst_render_wordpress_report_text() { return 0; }
 mst_render_backup_report_text() { return 0; }
 
 mst_command_services_run >/dev/null
 mst_command_security_run >/dev/null
+mst_command_security_events_run >/dev/null
 mst_command_website_run >/dev/null
 mst_command_wordpress_run >/dev/null
 mst_command_backup_run >/dev/null
 
-for module_name in services security website wordpress backup; do
+for module_name in services security security_events website wordpress backup; do
     report_file="${STATE_DIR}/reports/${module_name}.mrrf1.json"
     [[ -f "${report_file}" ]] || {
         printf 'missing persisted report: %s\n' "${report_file}" >&2
@@ -112,14 +129,15 @@ for module_name in services security website wordpress backup; do
     grep -F "\"command\":\"${module_name}\"" "${report_file}" >/dev/null || exit 1
 done
 
-unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON
+unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_SECURITY_EVENTS_REPORT_JSON
 unset MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
 
 mst_report_collect
-[[ "${MST_REPORT_TOTAL_OK}" == "5" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_OK}" == "6" ]] || exit 1
 [[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "1" ]] || exit 1
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted services report" >/dev/null || exit 1
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted security report" >/dev/null || exit 1
+printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted security events report" >/dev/null || exit 1
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted website report" >/dev/null || exit 1
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted WordPress report" >/dev/null || exit 1
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted backup report" >/dev/null || exit 1

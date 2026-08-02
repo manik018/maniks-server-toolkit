@@ -15,6 +15,7 @@ mst_command_help_run() {
     mst_table_row "mst health" "Collect local operating-system health"
     mst_table_row "mst services" "Collect local systemd service health"
     mst_table_row "mst security" "Collect local security posture"
+    mst_table_row "mst security_events" "Collect advanced security monitoring events"
     mst_table_row "mst website" "Collect website availability and TLS health"
     mst_table_row "mst wordpress" "Collect WordPress site health"
     mst_table_row "mst backup" "Collect backup freshness and metadata health"

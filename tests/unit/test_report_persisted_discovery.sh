@@ -44,7 +44,7 @@ make_report() {
 }
 
 export MST_STATE_DIR="${STATE_DIR}"
-unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON
+unset MST_HEALTH_REPORT_JSON MST_SERVICES_REPORT_JSON MST_SECURITY_REPORT_JSON MST_SECURITY_EVENTS_REPORT_JSON
 unset MST_WEBSITE_REPORT_JSON MST_WORDPRESS_REPORT_JSON MST_BACKUP_REPORT_JSON
 
 make_report health cpu "Persisted CPU healthy" > "${STATE_DIR}/reports/health.mrrf1.json"
@@ -52,10 +52,10 @@ make_report services nginx "Persisted nginx active" > "${STATE_DIR}/reports/serv
 
 mst_report_collect
 
-[[ "${MST_REPORT_TOTAL_MODULES}" == "6" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_RECORDS}" == "6" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_MODULES}" == "7" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_RECORDS}" == "7" ]] || exit 1
 [[ "${MST_REPORT_TOTAL_OK}" == "2" ]] || exit 1
-[[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "4" ]] || exit 1
+[[ "${MST_REPORT_TOTAL_UNAVAILABLE}" == "5" ]] || exit 1
 [[ "${MST_REPORT_STATUS}" == "unavailable" ]] || exit 1
 
 printf '%s\n' "${MST_REPORT_RECORD_ROWS[@]}" | grep -F "Persisted CPU healthy" >/dev/null || exit 1
