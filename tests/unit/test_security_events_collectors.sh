@@ -65,14 +65,15 @@ collect
 export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="true"
 export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd"
 export MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT="1"
-FAIL2BAN_BANNED="1.1.1.1 2.2.2.2"
+FAIL2BAN_BANNED="1.2.3.4 5.6.7.8 9.9.9.9"
 mst_command_exists() { [[ "${1}" == "fail2ban-client" ]]; }
 mst_exec_capture_stdout() {
     if [[ "${*: -1}" == "status" ]]; then
         printf 'Status\n'; return 0
     fi
     if [[ "${*: -1}" == "sshd" ]]; then
-        printf 'Currently banned: 2\nTotal banned: 4\nBanned IP list: %s\n' "${FAIL2BAN_BANNED}"
+        printf '%s\n' 'Status for the jail: sshd' '|- Filter' '|  |- Currently failed:'$'\t''2' '|  `- Total failed:'$'\t''57' '`- Actions' '   |- Currently banned:'$'\t''3' '   |- Total banned:'$'\t''12'
+        printf '   `- Banned IP list:'$'\t''%s\n' "${FAIL2BAN_BANNED}"
         return 0
     fi
     return 1
@@ -82,12 +83,12 @@ mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severiti
 [[ "${f2b_statuses[0]}" == "ok" ]] || exit 1
 grep -F 'new_blocked_ip_count' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
 grep -F '"value":0' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
-[[ "$(< "${STATE_DIR}/security_events/fail2ban_sshd.banned")" == $'1.1.1.1\n2.2.2.2' ]] || exit 1
-FAIL2BAN_BANNED="2.2.2.2 3.3.3.3"
+[[ "$(< "${STATE_DIR}/security_events/fail2ban_sshd.banned")" == $'1.2.3.4\n5.6.7.8\n9.9.9.9' ]] || exit 1
+FAIL2BAN_BANNED="5.6.7.8 10.10.10.10 1.2.3.4"
 mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
 [[ "${f2b_statuses[0]}" == "ok" ]] || exit 1
 grep -F '"value":1' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
-FAIL2BAN_BANNED="2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5"
+FAIL2BAN_BANNED="5.6.7.8 10.10.10.10 11.11.11.11 12.12.12.12"
 mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
 [[ "${f2b_statuses[0]}" == "warn" ]] || exit 1
 export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd;missing"

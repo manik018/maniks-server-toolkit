@@ -83,9 +83,9 @@ mst_security_events_collect_fail2ban_records() {
             mst_security_events_add_error "${errors_var}" dependency FAIL2BAN_JAIL_MISSING "Fail2Ban jail '${jail}' is not configured."
             records_ref+=("$(mst_mrrf_record_json "${record_var}" "${details_var}" "${errors_var}")"); statuses_ref+=(unavailable); severities_ref+=(unknown); vars_ref+=("${record_var}"); continue
         fi
-        current="$(sed -n 's/^[[:space:]]*Currently banned:[[:space:]]*\([0-9][0-9]*\).*/\1/p' <<< "${output}" | head -n1)"
-        total="$(sed -n 's/^[[:space:]]*Total banned:[[:space:]]*\([0-9][0-9]*\).*/\1/p' <<< "${output}" | head -n1)"
-        list="$(sed -n 's/^[[:space:]]*Banned IP list:[[:space:]]*//p' <<< "${output}" | head -n1)"
+        current="$(sed -n 's/^[^A-Za-z]*Currently banned:[[:space:]]*\([0-9][0-9]*\).*/\1/p' <<< "${output}" | head -n1)"
+        total="$(sed -n 's/^[^A-Za-z]*Total banned:[[:space:]]*\([0-9][0-9]*\).*/\1/p' <<< "${output}" | head -n1)"
+        list="$(sed -n 's/^[^A-Za-z]*Banned IP list:[[:space:]]*//p' <<< "${output}" | head -n1)"
         current_list="$(tr ' ' '\n' <<< "${list}" | sed '/^$/d')"
         [[ "${current}" =~ ^[0-9]+$ && "${total}" =~ ^[0-9]+$ ]] || { mst_security_events_fail2ban_record "${jail}" unavailable "Fail2Ban jail '${jail}' is not configured." "${details_var}" "${errors_var}" "${record_var}"; records_ref+=("$(mst_mrrf_record_json "${record_var}" "${details_var}" "${errors_var}")"); statuses_ref+=(unavailable); severities_ref+=(unknown); vars_ref+=("${record_var}"); continue; }
         state_path="$(mst_security_events_fail2ban_state_path "${jail}" 2>/dev/null || true)"; baseline=false; new_count=0

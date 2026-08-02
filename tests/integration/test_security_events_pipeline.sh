@@ -53,11 +53,12 @@ mst_command_run_with_lock() {
     "${command_fn}" "$@"
 }
 
-FAIL2BAN_BANNED="1.1.1.1 2.2.2.2"
+FAIL2BAN_BANNED="1.2.3.4 5.6.7.8 9.9.9.9"
 mst_command_exists() { [[ "${1}" == "fail2ban-client" ]] || command -v "${1}" >/dev/null 2>&1; }
 mst_exec_capture_stdout() {
     if [[ "${*: -1}" == "status" ]]; then printf 'Status\n'; return 0; fi
-    printf 'Currently banned: 2\nTotal banned: 4\nBanned IP list: %s\n' "${FAIL2BAN_BANNED}"
+    printf '%s\n' 'Status for the jail: sshd' '|- Filter' '|  |- Currently failed:'$'\t''2' '|  `- Total failed:'$'\t''57' '`- Actions' '   |- Currently banned:'$'\t''3' '   |- Total banned:'$'\t''12'
+    printf '   `- Banned IP list:'$'\t''%s\n' "${FAIL2BAN_BANNED}"
 }
 
 source "${ROOT_DIR}/commands/security_events.sh"
@@ -74,7 +75,7 @@ grep -q '"record_count":2' "${STATE_DIR}/reports/security_events.mrrf1.json" || 
 grep -q '"status":"ok"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${TMP_DIR}/security-events.out" || exit 1
-grep -q 'sshd jail: 2 currently banned, 4 total banned, 0 new blocks since last check.' "${TMP_DIR}/security-events.out" || exit 1
+grep -q 'sshd jail: 3 currently banned, 12 total banned, 0 new blocks since last check.' "${TMP_DIR}/security-events.out" || exit 1
 
 printf '%s\n' 'Aug 02 10:00:02 host sshd[3]: Failed password for root from 10.0.0.3 port 22 ssh2' >> "${AUTH_LOG_PATH}"
 second_status=0
@@ -82,7 +83,7 @@ mst_command_security_events_run > "${TMP_DIR}/security-events-second.out" || sec
 [[ "${second_status}" -eq "${MST_EXIT_PARTIAL}" ]] || exit 1
 grep -q '"status":"warn"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 0 accepted, 1 root login attempts since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
-grep -q 'sshd jail: 2 currently banned, 4 total banned, 0 new blocks since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q 'sshd jail: 3 currently banned, 12 total banned, 0 new blocks since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 
 source "${ROOT_DIR}/commands/report.sh"
 report_status=0
