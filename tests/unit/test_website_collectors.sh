@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="${ROOT_DIR}/.test-tmp/website-collectors"
 PROC_DIR="${TMP_DIR}/proc"
+TLS_NEAR_EXPIRY_DATE="$(date -u -d "+7 days" '+%b %d %H:%M:%S %Y GMT')"
 mkdir -p "${PROC_DIR}/sys/kernel" "${TMP_DIR}"
 
 cat > "${PROC_DIR}/sys/kernel/hostname" <<'EOF'
@@ -97,7 +98,7 @@ mst_website_tls_enddate() {
     case "${1}" in
         tls-valid.local) printf 'notAfter=Aug 30 12:00:00 2026 GMT\n' ;;
         tls-expired.local) printf 'notAfter=Jul 01 12:00:00 2026 GMT\n' ;;
-        tls-near.local) printf 'notAfter=Jul 24 12:00:00 2026 GMT\n' ;;
+        tls-near.local) printf 'notAfter=%s\n' "${TLS_NEAR_EXPIRY_DATE}" ;;
         *) return 1 ;;
     esac
 }
