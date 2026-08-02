@@ -214,6 +214,10 @@ mst_report_telegram_render_record_lines() {
                     *) printf '%s %s\n' "${mark}" "${target}" ;;
                 esac
                 ;;
+            security_events)
+                # Security-events OK records have useful counts, so show their summaries rather than generic targets.
+                printf '%s %s\n' "${mark}" "${summary}"
+                ;;
             target-summary)
                 printf '%s %s - %s\n' "${mark}" "${target}" "${summary}"
                 ;;
@@ -304,6 +308,17 @@ mst_render_report_telegram_full() {
         mst_report_telegram_render_record_lines backup target-summary
     fi
 
+    printf '\n%s Security Events\n' "$(mst_report_telegram_status_dot "$(mst_report_telegram_module_status security_events)")"
+    security_events_summary="$(mst_report_telegram_module_summary security_events || true)"
+    IFS='|' read -r _security_events_label _security_events_status _security_events_ok _security_events_warn _security_events_critical _security_events_unavailable _security_events_unknown _security_events_records <<< "${security_events_summary}"
+    if [[ "${_security_events_status}" == "unavailable" ]]; then
+        printf '⚪ Not available\n'
+    elif [[ -n "${security_events_summary}" ]]; then
+        mst_report_telegram_render_record_lines security_events security_events
+    else
+        printf '⚪ Not available\n'
+    fi
+
     printf '\n━━━━━━━━━━━━━━━━━━\n\n'
     printf 'Summary\n\n'
     printf '🟢 Success : %s\n' "${MST_REPORT_TOTAL_OK}"
@@ -364,7 +379,9 @@ mst_render_report_telegram_digest() {
         printf '⚪ Not available\n'
     else
         IFS='|' read -r _label _status ok_count warn_count critical_count unavailable_count unknown_count record_count <<< "${summary}"
-        if (( record_count > 0 && ok_count == record_count )); then
+        if [[ "${_status}" == "unavailable" ]]; then
+            printf '⚪ Not available\n'
+        elif (( record_count > 0 && ok_count == record_count )); then
             printf '✅ All running\n'
         else
             for index in "${!MST_REPORT_RECORD_ROWS[@]}"; do
@@ -417,6 +434,30 @@ mst_render_report_telegram_digest() {
         printf 'None configured\n'
     else
         mst_report_telegram_render_record_lines backup target-summary
+    fi
+
+    printf '\nSecurity Events:\n'
+    if ! summary="$(mst_report_telegram_module_summary security_events)"; then
+        printf '⚪ Not available\n'
+    else
+        IFS='|' read -r _label _status ok_count warn_count critical_count unavailable_count unknown_count record_count <<< "${summary}"
+        if (( record_count > 0 && ok_count == record_count )); then
+            printf '✅ No issues detected.\n'
+        else
+            seen_non_ok=0
+            for index in "${!MST_REPORT_RECORD_ROWS[@]}"; do
+                [[ "$(mst_report_telegram_record_field "${index}" module)" == "security_events" ]] || continue
+                status="$(mst_report_telegram_record_field "${index}" status)"
+                [[ "${status}" == "ok" ]] && continue
+                summary_text="$(mst_report_telegram_record_field "${index}" summary)"
+                if [[ "${status}" == "unavailable" && "${summary_text}" == No\ normalized\ MRRF1\ aggregate\ report\ was\ supplied\ for\ Security\ Events.* ]]; then
+                    continue
+                fi
+                printf '%s %s\n' "$(mst_report_telegram_status_mark "${status}")" "${summary_text}"
+                seen_non_ok=1
+            done
+            (( seen_non_ok == 1 )) || printf '⚪ Not available\n'
+        fi
     fi
 
     printf '\n'
