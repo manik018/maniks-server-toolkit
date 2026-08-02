@@ -96,6 +96,44 @@ mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severiti
 [[ "${#f2b_statuses[@]}" -eq 2 ]] || exit 1
 [[ "${f2b_statuses[1]}" == "unavailable" ]] || exit 1
 
+export MST_SECURITY_EVENTS_SUDO_CHECK_ENABLED="true"
+SUDO_MEMBERS="alice,bob"
+getent() { [[ "${1}" == "group" && "${2}" == "sudo" ]] && printf 'sudo:x:27:%s\n' "${SUDO_MEMBERS}"; }
+declare -a extra_jsons=() extra_statuses=() extra_severities=() extra_vars=()
+mst_security_events_collect_sudo_record extra_jsons extra_statuses extra_severities extra_vars
+grep -F '"value":0' <<< "${extra_jsons[0]}" >/dev/null || exit 1
+SUDO_MEMBERS="alice,bob,charlie"
+extra_jsons=(); extra_statuses=(); extra_severities=(); extra_vars=()
+mst_security_events_collect_sudo_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "warn" ]] || exit 1
+grep -F 'charlie' <<< "${extra_jsons[0]}" >/dev/null || exit 1
+SUDO_MEMBERS="alice,bob"
+extra_jsons=(); extra_statuses=(); extra_severities=(); extra_vars=()
+mst_security_events_collect_sudo_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "ok" ]] || exit 1
+grep -F 'removed_sudo_user_count' <<< "${extra_jsons[0]}" >/dev/null || exit 1
+
+export MST_SECURITY_EVENTS_CRON_CHECK_ENABLED="true"
+CRON_CONTENT=""
+crontab() { [[ "${1}" == "-l" ]] && { [[ -n "${CRON_CONTENT}" ]] && printf '%s\n' "${CRON_CONTENT}" || return 1; }; }
+mst_security_events_collect_cron_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "ok" ]] || exit 1
+extra_jsons=(); extra_statuses=(); extra_severities=(); extra_vars=()
+mst_security_events_collect_cron_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "ok" ]] || exit 1
+CRON_CONTENT='0 * * * * root /usr/bin/true'
+extra_jsons=(); extra_statuses=(); extra_severities=(); extra_vars=()
+mst_security_events_collect_cron_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "warn" ]] || exit 1
+MST_SECURITY_EVENTS_CRON_CHECK_ENABLED="false"
+
+MST_SECURITY_EVENTS_PACKAGE_UPDATES_WARN_COUNT="1"
+mst_command_exists() { [[ "${1}" == "apt" ]]; }
+apt() { printf '%s\n' 'Listing...' 'pkg1/stable 1.0 amd64 [upgradable from: 0.9]' 'pkg2/stable 2.0 amd64 [upgradable from: 1.9]'; }
+mst_security_events_collect_package_record extra_jsons extra_statuses extra_severities extra_vars
+[[ "${extra_statuses[0]}" == "warn" ]] || exit 1
+unset -f apt mst_command_exists getent crontab
+
 unset -f mst_command_exists mst_exec_capture_stdout
 export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="false"
 

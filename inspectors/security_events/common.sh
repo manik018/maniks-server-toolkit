@@ -17,6 +17,97 @@ mst_security_events_init_defaults() {
     export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="${MST_SECURITY_EVENTS_FAIL2BAN_ENABLED:-true}"
     export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="${MST_SECURITY_EVENTS_FAIL2BAN_JAILS:-sshd}"
     export MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT="${MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT:-10}"
+    export MST_SECURITY_EVENTS_SUDO_CHECK_ENABLED="${MST_SECURITY_EVENTS_SUDO_CHECK_ENABLED:-true}"
+    export MST_SECURITY_EVENTS_CRON_CHECK_ENABLED="${MST_SECURITY_EVENTS_CRON_CHECK_ENABLED:-true}"
+    export MST_SECURITY_EVENTS_PACKAGE_UPDATES_WARN_COUNT="${MST_SECURITY_EVENTS_PACKAGE_UPDATES_WARN_COUNT:-20}"
+}
+
+mst_security_events_snapshot_path() {
+    local name="${1:?snapshot name required}" dir
+    dir="$(mst_fs_validate_runtime_directory "${MST_STATE_DIR:?state dir required}/security_events")" || return 1
+    mst_fs_ensure_directory "${dir}" || return 1
+    mst_fs_validate_runtime_file_path "${dir}/${name}"
+}
+
+mst_security_events_add_typed_detail() {
+    local details_name="${1:?details required}" key_name="${2:?key required}" label="${3:?label required}" value_type="${4:?type required}" value="${5:-}"
+    local -n details_ref="${details_name}"
+    details_ref+=("$(mst_mrrf_pack_detail "${key_name}" "${label}" "${value_type}" "${value}" "" "false")")
+}
+
+mst_security_events_append_extra_record() {
+    local record_var="${1:?record var required}" records_name="${2:?records required}" statuses_name="${3:?statuses required}" severities_name="${4:?severities required}" vars_name="${5:?vars required}" record_status="${6:?status required}" record_severity="${7:?severity required}"
+    local -n records_ref="${records_name}" statuses_ref="${statuses_name}" severities_ref="${severities_name}" vars_ref="${vars_name}" record_ref="${record_var}"
+    records_ref+=("$(mst_mrrf_record_json "${record_var}" "${record_var}_DETAILS" "${record_var}_ERRORS")")
+    statuses_ref+=("${record_status}"); severities_ref+=("${record_severity}"); vars_ref+=("${record_var}")
+}
+
+mst_security_events_new_user_summary() {
+    local list="${1:-}" count=0 name shown=""
+    for name in ${list}; do
+        count=$((count + 1)); if (( count <= 5 )); then shown+="${shown:+, }${name}"; fi
+    done
+    if (( count > 5 )); then shown+=" +$((count - 5)) more"; fi
+    printf '%s|%s' "${count}" "${shown}"
+}
+
+mst_security_events_collect_sudo_record() {
+    local records_name="${1:?records required}" statuses_name="${2:?statuses required}" severities_name="${3:?severities required}" vars_name="${4:?vars required}"
+    local group_line members snapshot current_list new_list removed_list snapshot_path baseline=false summary status result count shown name
+    local -n records_ref="${records_name}" statuses_ref="${statuses_name}" severities_ref="${severities_name}" vars_ref="${vars_name}"
+    [[ "${MST_SECURITY_EVENTS_SUDO_CHECK_ENABLED}" == "true" ]] || return 0
+    group_line="$(getent group sudo 2>/dev/null || true)"
+    members="${group_line##*:}"
+    current_list="$(tr ',' '\n' <<< "${members}" | sed '/^$/d' | sort -u)"
+    snapshot_path="$(mst_security_events_snapshot_path sudo_members.snapshot 2>/dev/null || true)"
+    if [[ -n "${snapshot_path}" && -f "${snapshot_path}" ]]; then
+        new_list="$(comm -23 <(printf '%s\n' "${current_list}") <(sort -u "${snapshot_path}"))"
+        removed_list="$(comm -13 <(printf '%s\n' "${current_list}") <(sort -u "${snapshot_path}"))"
+    else
+        baseline=true; new_list=""; removed_list=""
+    fi
+    result="$(mst_security_events_new_user_summary "${new_list}")"; IFS='|' read -r count shown <<< "${result}"
+    status=ok; (( count > 0 )) && status=warn
+    if (( count > 0 )); then summary="${count} new sudo user(s) detected: ${shown}."; else summary="No sudo group membership changes."; fi
+    declare -gA MST_SECURITY_EVENTS_SUDO_RECORD=(); declare -ga MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS=() MST_SECURITY_EVENTS_SUDO_RECORD_ERRORS=()
+    local -n record_ref=MST_SECURITY_EVENTS_SUDO_RECORD details_ref=MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS errors_ref=MST_SECURITY_EVENTS_SUDO_RECORD_ERRORS
+    record_ref=([result_id]="res_security_events.sudo_group_membership" [module]="security_events" [check]="sudo_group_membership" [target]="sudo" [status]="${status}" [severity]="${status}" [score]="null" [summary]="${summary}" [source_list]="getent,state" [provenance]="Current sudo group membership compared with an atomic snapshot." [privilege_requirement]="none" [redactions_present]="false" [duration_ms]="0" [observed_at]="$(mst_mrrf_now_utc)")
+    mst_security_events_add_typed_detail MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS current_sudo_user_count "Current Sudo Users" integer "$(printf '%s\n' "${current_list}" | sed '/^$/d' | wc -l | tr -d ' ')"
+    mst_security_events_add_typed_detail MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS new_sudo_user_count "New Sudo Users" integer "${count}"
+    mst_security_events_add_typed_detail MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS removed_sudo_user_count "Removed Sudo Users" integer "$(printf '%s\n' "${removed_list}" | sed '/^$/d' | wc -l | tr -d ' ')"
+    [[ "${baseline}" == true ]] && mst_security_events_add_typed_detail MST_SECURITY_EVENTS_SUDO_RECORD_DETAILS baseline_established "Baseline Established" boolean true
+    [[ -n "${snapshot_path}" ]] && mst_fs_atomic_write "${snapshot_path}" 0660 "${current_list}"
+    mst_security_events_append_extra_record MST_SECURITY_EVENTS_SUDO_RECORD "${records_name}" "${statuses_name}" "${severities_name}" "${vars_name}" "${status}" "${status}"
+}
+
+mst_security_events_collect_cron_record() {
+    local records_name="${1:?records required}" statuses_name="${2:?statuses required}" severities_name="${3:?severities required}" vars_name="${4:?vars required}" current snapshot_path previous changed=false
+    local -n records_ref="${records_name}" statuses_ref="${statuses_name}" severities_ref="${severities_name}" vars_ref="${vars_name}"
+    [[ "${MST_SECURITY_EVENTS_CRON_CHECK_ENABLED}" == "true" ]] || return 0
+    current="$( (crontab -l -u root 2>/dev/null || true); for file in /etc/cron.d/*; do [[ -f "${file}" ]] || continue; sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "${file}"; done )"
+    snapshot_path="$(mst_security_events_snapshot_path cron_snapshot.state 2>/dev/null || true)"
+    [[ -f "${snapshot_path}" ]] && [[ "${current}" != "$(< "${snapshot_path}")" ]] && changed=true
+    declare -gA MST_SECURITY_EVENTS_CRON_RECORD=(); declare -ga MST_SECURITY_EVENTS_CRON_RECORD_DETAILS=() MST_SECURITY_EVENTS_CRON_RECORD_ERRORS=()
+    local -n record_ref=MST_SECURITY_EVENTS_CRON_RECORD
+    status=ok; [[ "${changed}" == true ]] && status=warn
+    if [[ "${changed}" == true ]]; then summary="Cron job configuration changed since last check — review root crontab and /etc/cron.d/."; else summary="No cron job changes detected."; fi
+    record_ref=([result_id]="res_security_events.cron_job_changes" [module]="security_events" [check]="cron_job_changes" [target]="system-cron" [status]="${status}" [severity]="${status}" [score]="null" [summary]="${summary}" [source_list]="crontab,filesystem,state" [provenance]="Normalized root crontab and /etc/cron.d entries compared with a snapshot." [privilege_requirement]="none" [redactions_present]="false" [duration_ms]="0" [observed_at]="$(mst_mrrf_now_utc)")
+    mst_security_events_add_typed_detail MST_SECURITY_EVENTS_CRON_RECORD_DETAILS cron_changed "Cron Changed" boolean "${changed}"
+    [[ -f "${snapshot_path}" ]] || mst_security_events_add_typed_detail MST_SECURITY_EVENTS_CRON_RECORD_DETAILS baseline_established "Baseline Established" boolean true
+    [[ -n "${snapshot_path}" ]] && mst_fs_atomic_write "${snapshot_path}" 0660 "${current}"
+    mst_security_events_append_extra_record MST_SECURITY_EVENTS_CRON_RECORD "${records_name}" "${statuses_name}" "${severities_name}" "${vars_name}" "${status}" "${status}"
+}
+
+mst_security_events_collect_package_record() {
+    local records_name="${1:?records required}" statuses_name="${2:?statuses required}" severities_name="${3:?severities required}" vars_name="${4:?vars required}" output count status summary
+    local -n records_ref="${records_name}" statuses_ref="${statuses_name}" severities_ref="${severities_name}" vars_ref="${vars_name}"
+    declare -gA MST_SECURITY_EVENTS_PACKAGE_RECORD=(); declare -ga MST_SECURITY_EVENTS_PACKAGE_RECORD_DETAILS=() MST_SECURITY_EVENTS_PACKAGE_RECORD_ERRORS=()
+    local -n record_ref=MST_SECURITY_EVENTS_PACKAGE_RECORD
+    if ! mst_command_exists apt; then status=unavailable; summary="Package manager apt is unavailable."; count=0; else output="$(apt list --upgradable 2>/dev/null || true)"; count="$(grep -v '^Listing\.\.\.' <<< "${output}" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"; status=ok; (( count > 10#${MST_SECURITY_EVENTS_PACKAGE_UPDATES_WARN_COUNT} )) && status=warn; summary="${count} package update(s) available."; fi
+    record_ref=([result_id]="res_security_events.package_updates" [module]="security_events" [check]="package_updates" [target]="apt" [status]="${status}" [severity]="${status}" [score]="null" [summary]="${summary}" [source_list]="apt" [provenance]="Current apt upgrade listing." [privilege_requirement]="none" [redactions_present]="false" [duration_ms]="0" [observed_at]="$(mst_mrrf_now_utc)")
+    mst_security_events_add_typed_detail MST_SECURITY_EVENTS_PACKAGE_RECORD_DETAILS upgradable_package_count "Upgradable Packages" integer "${count}"
+    [[ "${status}" == unavailable ]] && mst_security_events_add_error MST_SECURITY_EVENTS_PACKAGE_RECORD_ERRORS dependency APT_UNAVAILABLE "The apt command is unavailable."
+    mst_security_events_append_extra_record MST_SECURITY_EVENTS_PACKAGE_RECORD "${records_name}" "${statuses_name}" "${severities_name}" "${vars_name}" "${status}" "${status}"
 }
 
 mst_security_events_fail2ban_state_path() {

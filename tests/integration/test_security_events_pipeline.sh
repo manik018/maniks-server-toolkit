@@ -42,6 +42,9 @@ export MST_SECURITY_EVENTS_SSH_ROOT_ATTEMPT_WARN_COUNT="1"
 export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="true"
 export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd"
 export MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT="10"
+export MST_SECURITY_EVENTS_SUDO_CHECK_ENABLED="true"
+export MST_SECURITY_EVENTS_CRON_CHECK_ENABLED="true"
+export MST_SECURITY_EVENTS_PACKAGE_UPDATES_WARN_COUNT="20"
 export MST_ALERTS_ENABLED="false"
 export MST_ALERT_MODULES="all"
 mst_logging_init
@@ -54,6 +57,9 @@ mst_command_run_with_lock() {
 }
 
 FAIL2BAN_BANNED="1.2.3.4 5.6.7.8 9.9.9.9"
+getent() { [[ "${1}" == "group" && "${2}" == "sudo" ]] && printf 'sudo:x:27:alice,bob\n'; }
+crontab() { return 1; }
+apt() { printf '%s\n' 'Listing...' 'pkg1/stable 1.0 amd64 [upgradable from: 0.9]'; }
 mst_command_exists() { [[ "${1}" == "fail2ban-client" ]] || command -v "${1}" >/dev/null 2>&1; }
 mst_exec_capture_stdout() {
     if [[ "${*: -1}" == "status" ]]; then printf 'Status\n'; return 0; fi
@@ -71,11 +77,14 @@ mst_command_security_events_run > "${TMP_DIR}/security-events.out"
 grep -q '"command":"security_events"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '"check":"ssh_login_activity"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '"check":"fail2ban_jail_status"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
-grep -q '"record_count":2' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q '"record_count":5' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '"status":"ok"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${TMP_DIR}/security-events.out" || exit 1
 grep -q 'sshd jail: 3 currently banned, 12 total banned, 0 new blocks since last check.' "${TMP_DIR}/security-events.out" || exit 1
+grep -q 'No sudo group membership changes.' "${TMP_DIR}/security-events.out" || exit 1
+grep -q 'No cron job changes detected.' "${TMP_DIR}/security-events.out" || exit 1
+grep -q '1 package update(s) available.' "${TMP_DIR}/security-events.out" || exit 1
 
 printf '%s\n' 'Aug 02 10:00:02 host sshd[3]: Failed password for root from 10.0.0.3 port 22 ssh2' >> "${AUTH_LOG_PATH}"
 second_status=0
