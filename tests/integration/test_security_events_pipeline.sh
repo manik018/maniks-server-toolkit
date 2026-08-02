@@ -39,6 +39,9 @@ export MST_SECURITY_EVENTS_ENABLED="true"
 export MST_SECURITY_EVENTS_AUTH_LOG_PATH="${AUTH_LOG_PATH}"
 export MST_SECURITY_EVENTS_SSH_FAILED_WARN_COUNT="10"
 export MST_SECURITY_EVENTS_SSH_ROOT_ATTEMPT_WARN_COUNT="1"
+export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="true"
+export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd"
+export MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT="10"
 export MST_ALERTS_ENABLED="false"
 export MST_ALERT_MODULES="all"
 mst_logging_init
@@ -50,6 +53,13 @@ mst_command_run_with_lock() {
     "${command_fn}" "$@"
 }
 
+FAIL2BAN_BANNED="1.1.1.1 2.2.2.2"
+mst_command_exists() { [[ "${1}" == "fail2ban-client" ]] || command -v "${1}" >/dev/null 2>&1; }
+mst_exec_capture_stdout() {
+    if [[ "${*: -1}" == "status" ]]; then printf 'Status\n'; return 0; fi
+    printf 'Currently banned: 2\nTotal banned: 4\nBanned IP list: %s\n' "${FAIL2BAN_BANNED}"
+}
+
 source "${ROOT_DIR}/commands/security_events.sh"
 cat > "${AUTH_LOG_PATH}" <<'EOF'
 Aug 02 10:00:00 host sshd[1]: Failed password for invalid user guest from 10.0.0.1 port 22 ssh2
@@ -59,8 +69,12 @@ mst_command_security_events_run > "${TMP_DIR}/security-events.out"
 [[ -f "${STATE_DIR}/reports/security_events.mrrf1.json" ]] || exit 1
 grep -q '"command":"security_events"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '"check":"ssh_login_activity"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q '"check":"fail2ban_jail_status"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q '"record_count":2' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '"status":"ok"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q '1 failed SSH login(s), 1 accepted, 0 root login attempts since last check.' "${TMP_DIR}/security-events.out" || exit 1
+grep -q 'sshd jail: 2 currently banned, 4 total banned, 0 new blocks since last check.' "${TMP_DIR}/security-events.out" || exit 1
 
 printf '%s\n' 'Aug 02 10:00:02 host sshd[3]: Failed password for root from 10.0.0.3 port 22 ssh2' >> "${AUTH_LOG_PATH}"
 second_status=0
@@ -68,6 +82,7 @@ mst_command_security_events_run > "${TMP_DIR}/security-events-second.out" || sec
 [[ "${second_status}" -eq "${MST_EXIT_PARTIAL}" ]] || exit 1
 grep -q '"status":"warn"' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 grep -q '1 failed SSH login(s), 0 accepted, 1 root login attempts since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
+grep -q 'sshd jail: 2 currently banned, 4 total banned, 0 new blocks since last check.' "${STATE_DIR}/reports/security_events.mrrf1.json" || exit 1
 
 source "${ROOT_DIR}/commands/report.sh"
 report_status=0

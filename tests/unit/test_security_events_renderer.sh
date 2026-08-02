@@ -12,6 +12,7 @@ mst_status_badge() { printf '[%s]' "${1}"; }
 source "${ROOT_DIR}/renderers/security_events_text.sh"
 
 declare -gA MST_SECURITY_EVENTS_MODULE_STATUS_RECORD=()
+declare -ga MST_SECURITY_EVENTS_RECORD_VARS=(MST_SECURITY_EVENTS_MODULE_STATUS_RECORD)
 
 MST_SECURITY_EVENTS_MODULE_STATUS_RECORD[status]="warn"
 MST_SECURITY_EVENTS_MODULE_STATUS_RECORD[summary]="Warning summary."

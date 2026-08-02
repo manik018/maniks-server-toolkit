@@ -62,6 +62,42 @@ printf '%s\n' "1|0" > "${STATE_DIR}/security_events/auth_log.cursor"
 collect
 [[ "${test_record[summary]}" == "2 failed SSH login(s), 2 accepted, 1 root login attempts since last check." ]] || exit 1
 
+export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="true"
+export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd"
+export MST_SECURITY_EVENTS_FAIL2BAN_NEW_BLOCK_WARN_COUNT="1"
+FAIL2BAN_BANNED="1.1.1.1 2.2.2.2"
+mst_command_exists() { [[ "${1}" == "fail2ban-client" ]]; }
+mst_exec_capture_stdout() {
+    if [[ "${*: -1}" == "status" ]]; then
+        printf 'Status\n'; return 0
+    fi
+    if [[ "${*: -1}" == "sshd" ]]; then
+        printf 'Currently banned: 2\nTotal banned: 4\nBanned IP list: %s\n' "${FAIL2BAN_BANNED}"
+        return 0
+    fi
+    return 1
+}
+declare -a f2b_jsons=() f2b_statuses=() f2b_severities=() f2b_vars=()
+mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
+[[ "${f2b_statuses[0]}" == "ok" ]] || exit 1
+grep -F 'new_blocked_ip_count' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
+grep -F '"value":0' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
+[[ "$(< "${STATE_DIR}/security_events/fail2ban_sshd.banned")" == $'1.1.1.1\n2.2.2.2' ]] || exit 1
+FAIL2BAN_BANNED="2.2.2.2 3.3.3.3"
+mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
+[[ "${f2b_statuses[0]}" == "ok" ]] || exit 1
+grep -F '"value":1' <<< "${f2b_jsons[0]}" >/dev/null || exit 1
+FAIL2BAN_BANNED="2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5"
+mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
+[[ "${f2b_statuses[0]}" == "warn" ]] || exit 1
+export MST_SECURITY_EVENTS_FAIL2BAN_JAILS="sshd;missing"
+mst_security_events_collect_fail2ban_records f2b_jsons f2b_statuses f2b_severities f2b_vars
+[[ "${#f2b_statuses[@]}" -eq 2 ]] || exit 1
+[[ "${f2b_statuses[1]}" == "unavailable" ]] || exit 1
+
+unset -f mst_command_exists mst_exec_capture_stdout
+export MST_SECURITY_EVENTS_FAIL2BAN_ENABLED="false"
+
 rm -f -- "${LOG_PATH}"
 collect
 [[ "${test_record[status]}" == "unavailable" ]] || exit 1

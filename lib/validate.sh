@@ -275,6 +275,15 @@ mst_validate_absolute_path() {
     [[ "${1:-}" == /* ]]
 }
 
+mst_validate_security_events_fail2ban_jails() {
+    local value="${1:-}" jail
+    [[ -n "${value}" ]] || return 1
+    IFS=';' read -r -a jails <<< "${value}"
+    for jail in "${jails[@]}"; do
+        [[ "${jail}" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    done
+}
+
 # Return success if the path is safe to use as an MST-owned path.
 mst_validate_mst_owned_path() {
     case "${1:-}" in

@@ -18,7 +18,11 @@ mst_security_events_status_badge() {
 }
 
 mst_render_security_events_report_text() {
+    local record_var
     mst_header "$(mst_version_string)"
     mst_section "Security Events"
-    printf '%s %s\n' "$(mst_security_events_status_badge "${MST_SECURITY_EVENTS_MODULE_STATUS_RECORD[status]}")" "${MST_SECURITY_EVENTS_MODULE_STATUS_RECORD[summary]}"
+    for record_var in "${MST_SECURITY_EVENTS_RECORD_VARS[@]}"; do
+        local -n record_ref="${record_var}"
+        printf '%s %s\n' "$(mst_security_events_status_badge "${record_ref[status]}")" "${record_ref[summary]}"
+    done
 }
