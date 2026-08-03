@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Hardened MRRF1 text handling by stripping ASCII control characters (`0x00`-`0x1F`) and DEL during sanitization and escaping. This ensures RFC 8259-compliant JSON output and prevents terminal escape sequences originating from attacker-influenced data, including HTTP response headers, redirect URLs, and WP-CLI output from compromised sites, from reaching administrator terminals or report consumers.
+
 ## 1.1.0
 
 - Added the `security_events` module (`mst security_events`) with five independent checks: incremental SSH login activity, Fail2Ban jail statistics, new sudo group membership, cron configuration changes, and available APT package updates. Each check supports independent configuration and emits its own MRRF1 record with appropriate status.
