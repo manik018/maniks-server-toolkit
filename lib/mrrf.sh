@@ -21,6 +21,7 @@ mst_mrrf_sanitize_text() {
     value="${value//$'\n'/ }"
     value="${value//$'\r'/ }"
     value="${value//$'\t'/ }"
+    value="$(printf '%s' "${value}" | LC_ALL=C tr -d '\000-\010\013\014\016-\037\177')"
     value="${value//\\/\\\\}"
     printf "%.${max_length}s" "${value}"
 }
@@ -35,6 +36,8 @@ mst_mrrf_json_escape() {
     value="${value//$'\n'/\\n}"
     value="${value//$'\r'/\\r}"
     value="${value//$'\t'/\\t}"
+    # Drop any remaining raw control bytes so every emitted JSON string remains RFC 8259 compliant.
+    value="$(printf '%s' "${value}" | LC_ALL=C tr -d '\000-\010\013\014\016-\037\177')"
     printf '%s' "${value}"
 }
 
