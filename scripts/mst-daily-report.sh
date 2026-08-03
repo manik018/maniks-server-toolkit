@@ -15,6 +15,7 @@ fi
 "${MST_BIN}" website >/dev/null 2>&1 || true
 "${MST_BIN}" wordpress >/dev/null 2>&1 || true
 "${MST_BIN}" backup >/dev/null 2>&1 || true
+"${MST_BIN}" security_events >/dev/null 2>&1 || true
 "${MST_BIN}" alert >/dev/null 2>&1 || true
 
 report_output="$("${MST_BIN}" report --style digest 2>/dev/null)"

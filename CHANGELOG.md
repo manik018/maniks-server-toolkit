@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Added the `security_events` module (`mst security_events`) with five independent checks: incremental SSH login activity, Fail2Ban jail statistics, new sudo group membership, cron configuration changes, and available APT package updates. Each check supports independent configuration and emits its own MRRF1 record with appropriate status.
+- Unified reports, Telegram styles (`telegram`, `digest`, `critical`, and `auto`), and the alert engine now include `security_events` alongside the original six modules.
+- `scripts/mst-daily-report.sh` now runs `security_events` in the daily monitoring pipeline.
+
 ## 1.0.6
 
 ### Telegram reporting and daily delivery

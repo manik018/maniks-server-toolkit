@@ -59,7 +59,7 @@ set -e
     exit 1
 }
 
-expected_order=$'health\nservices\nsecurity\nwebsite\nwordpress\nbackup\nalert\nreport --style digest\ntelegram'
+expected_order=$'health\nservices\nsecurity\nwebsite\nwordpress\nbackup\nsecurity_events\nalert\nreport --style digest\ntelegram'
 actual_order="$(cat "${LOG_FILE}")"
 [[ "${actual_order}" == "${expected_order}" ]] || {
     printf 'unexpected command order:\n%s\n' "${actual_order}" >&2
